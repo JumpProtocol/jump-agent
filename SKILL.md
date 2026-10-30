@@ -103,4 +103,4 @@ Website `/api/agent-wallet/*` is a separate browser-cookie session with Origin c
 
 ## Official deployment status
 
-The intended public origin is https://app.jump.family and the official distribution repository is https://github.com/JumpProtocol/jump-agent. This is a preview integration. At initial publication, Agent v1 production endpoints and a production runtime release are not enabled. Check capabilities before use; a 404 or disabled flag means stop all write preparation and execution. Do not guess a package name or run an unguarded wallet command. Local tests do not establish live Binance signing or funds acceptance.
+The intended origin is https://app.jump.family and the distribution repository is https://github.com/JumpProtocol/jump-agent. This is a preview integration. Production Agent v1 preparation and a formal runtime release are not enabled at initial publication. Missing capabilities or disabled flags stop execution. Local tests do not establish live wallet acceptance.

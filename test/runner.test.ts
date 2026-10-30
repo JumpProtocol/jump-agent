@@ -48,7 +48,7 @@ async function fixture() {
   runner.api.request = async (path) => {
     if (path === '/agent/v1/reservations') return { operation_id: remoteId = randomUUID() };
     if (path.endsWith('/dispatch')) return { operation_id: remoteId, state: 'SUBMISSION_UNKNOWN', guard_active: true };
-    if (path.endsWith('/result')) return { state: 'CONFIRMED', guard_active: false };
+    if (path.endsWith('/result')) return { operation_id: path.split('/')[4], chain_id: 56, wallet: walletAddress, state: 'CONFIRMED', guard_active: false };
     throw new Error('Unexpected API request: ' + path);
   };
   runner.context = async () => context as any;
@@ -330,5 +330,21 @@ test('read-only domain resolution validates provider identity and preserves fall
     assert.equal(result.isFallback, true);
     assert.equal(result.verifiedAgentIdentity, false);
     await assert.rejects(() => f.runner.resolveDomain('bob.ai'), /Unsupported domain/);
+  } finally { await f.cleanup(); }
+});
+
+test('dual-approved server closure synchronizes only the matching local reservation', async () => {
+  const f = await fixture();
+  try {
+    const preview = await f.runner.preview(1, 'deposit', '0.1');
+    f.setTimeout();
+    await assert.rejects(() => f.runner.execute(preview.previewId, preview.confirmDigest), /timed out/);
+    const record = await f.store.get(preview.previewId);
+    f.runner.api.request = async () => ({ operation_id: record.remoteOperationId, chain_id: 56, wallet: walletAddress,
+      state: 'MANUALLY_CLOSED', guard_active: false });
+    assert.equal((await f.runner.result(preview.previewId)).state, 'MANUALLY_CLOSED');
+    assert.equal((await f.runner.pending(walletAddress)).state, 'NO_LOCAL_RESERVATION');
+    const next = await f.runner.preview(1, 'deposit', '0.1');
+    assert.ok(next.previewId);
   } finally { await f.cleanup(); }
 });

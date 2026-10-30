@@ -291,11 +291,16 @@ export class Runner {
 
   private async reportRemote(record: any, reconcile: boolean) {
     const { plan } = record;
-    return this.api.request(`/agent/v1/reservations/${record.remoteOperationId}/result`, {
+    const shared = await this.api.request(`/agent/v1/reservations/${record.remoteOperationId}/result`, {
       token: await this.session(plan.wallet), body: { reconcile,
         ...(record.result ? { result: Object.fromEntries(['status', 'orderId', 'txHash'].filter(k => record.result[k] != null).map(k => [k, record.result[k]])) } : {}),
       },
     });
+    if (shared.operation_id !== record.remoteOperationId || shared.chain_id !== plan.chainId ||
+        typeof shared.wallet !== 'string' || getAddress(shared.wallet) !== plan.wallet || typeof shared.guard_active !== 'boolean') {
+      throw new Error('Shared recovery identity mismatch; local wallet guard retained');
+    }
+    return shared;
   }
 
   private async finishLogin(record: any, id: string) {
@@ -320,7 +325,22 @@ export class Runner {
     if (record.plan.api !== this.api.base || record.plan.chainId !== chainId(this.options)) throw new Error('Preview scope mismatch');
     if (digest(record.plan) !== record.digest) throw new Error('Stored preview changed');
     if (record.state === 'previewed' && await this.store.isClaimed(id)) record.state = 'submission-unknown';
-    if (['AUTHENTICATED', 'REJECTED', 'EXPIRED'].includes(record.state)) return journalEntry(id, record);
+    if (record.state === 'MANUALLY_CLOSED') return journalEntry(id, record);
+    if (record.plan.kind === 'transaction' && record.remoteOperationId) {
+      const shared = await this.reportRemote(record, false);
+      if (shared.state === 'MANUALLY_CLOSED' && shared.guard_active === false) {
+        record.state = 'MANUALLY_CLOSED';
+        await this.store.complete(submissionKey(record.plan.chainId, record.plan.wallet), id, record);
+        return journalEntry(id, record);
+      }
+      if (shared.tx_hash) {
+        const originalHash = hex32.parse(shared.tx_hash);
+        if (record.result?.txHash && record.result.txHash.toLowerCase() !== originalHash.toLowerCase()) throw new Error('Original shared hash changed; guard retained');
+        record.result = { ...record.result, txHash: originalHash, ...(shared.order_id ? { orderId: shared.order_id } : {}) };
+        await this.store.put(id, record);
+      }
+    }
+    if (record.plan.kind === 'login' && ['AUTHENTICATED', 'REJECTED', 'EXPIRED'].includes(record.state)) return journalEntry(id, record);
     if (record.plan.kind === 'login' && record.state !== 'AUTHENTICATED' && record.result?.orderId && !record.result.signature) {
       const result = await this.wallet.call(['sign-message', 'result', '--order-id', record.result.orderId]);
       const updated = await this.store.update(id, current => current.state === 'AUTHENTICATED' ? current : {

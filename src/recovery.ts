@@ -1,7 +1,7 @@
 import { getAddress } from 'viem';
 
 export function nextAction(state: string, kind: string, hasHash = false) {
-  if (['AUTHENTICATED', 'CONFIRMED', 'REVERTED'].includes(state)) return 'COMPLETE';
+  if (['AUTHENTICATED', 'CONFIRMED', 'REVERTED', 'MANUALLY_CLOSED'].includes(state)) return 'COMPLETE';
   if (['REJECTED', 'EXPIRED'].includes(state) && kind === 'login') return 'CREATE_NEW_LOGIN_PREVIEW';
   if (state === 'previewed') return 'REVIEW_AND_CONFIRM';
   if (state === 'NOT_SUBMITTED') return 'INSTALL_WALLET_AND_CREATE_NEW_PREVIEW';
