@@ -342,7 +342,9 @@ test('dual-approved server closure synchronizes only the matching local reservat
     const record = await f.store.get(preview.previewId);
     f.runner.api.request = async () => ({ operation_id: record.remoteOperationId, chain_id: 56, wallet: walletAddress,
       state: 'MANUALLY_CLOSED', guard_active: false });
-    assert.equal((await f.runner.result(preview.previewId)).state, 'MANUALLY_CLOSED');
+    const closed = await f.runner.result(preview.previewId);
+    assert.ok('state' in closed);
+    assert.equal(closed.state, 'MANUALLY_CLOSED');
     assert.equal((await f.runner.pending(walletAddress)).state, 'NO_LOCAL_RESERVATION');
     const next = await f.runner.preview(1, 'deposit', '0.1');
     assert.ok(next.previewId);
