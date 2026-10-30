@@ -809,6 +809,43 @@ export const AUCTION_ENGINE_ABI = [
     "inputs": [
       {
         "indexed": true,
+        "internalType": "uint256",
+        "name": "launchId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "participant",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "asset",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "deferred",
+        "type": "bool"
+      }
+    ],
+    "name": "RefundPaid",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
         "internalType": "bytes32",
         "name": "role",
         "type": "bytes32"
