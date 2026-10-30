@@ -1,0 +1,35 @@
+{
+  "name": "@jump-family/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "jump": "dist/cli.js"
+  },
+  "exports": {
+    "./sdk": "./dist/sdk.js"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node test.mjs",
+    "release:public": "python3 scripts/build-public-release.py"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.4.0",
+    "commander": "12.1.0",
+    "qrcode": "1.5.4",
+    "viem": "2.56.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
+    "@types/node": "22.15.30",
+    "@types/qrcode": "1.5.6",
+    "esbuild": "0.25.12",
+    "typescript": "5.9.3"
+  }
+}

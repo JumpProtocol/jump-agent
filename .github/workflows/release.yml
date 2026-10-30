@@ -1,0 +1,38 @@
+name: Verify Agent release
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck && npm test && npm audit --omit=dev --audit-level=low
+      - run: python3 scripts/build-public-release.py --production
+      - run: python3 scripts/verify-public-release.py
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: release/agent-distribution/**/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-agent-distribution
+          path: release/agent-distribution/
+          if-no-files-found: error
+          retention-days: 30
+# Artifact creation and provenance only. Public package/website publication and
+# production deployment are separate reviewed steps after the channel/domain is selected.
