@@ -19,14 +19,10 @@ The MCP runtime runs locally with Node.js 22 or later and uses the separately in
 - Wallet keys remain with the wallet provider. Never share seed phrases, private keys, wallet sessions or API bearer tokens.
 - Never scan a forwarded QR. A matching pairing code does not establish who controls the browser session.
 - An unknown submission or missing transaction hash remains blocked. Never delete state or repeat execute to work around it.
+- Keep Agent state on a local filesystem with working kernel file locks; NFS/SMB state directories are not supported. Upgrade all local clients together. Legacy `.lock` files require inspection with old clients stopped; do not delete pending or claimed submission evidence.
+- Runtime result reports trust the authenticated local client. Nonce/block checks reject old receipts, but do not cryptographically bind a hash to a Binance requestId. Protect the Agent token and local state together.
 - Human/Agent is an interaction view. A wallet or `.ai` lookup does not prove Agent identity or launch authorship.
 
 ## Release status
 
 No production runtime release has been published. Local development artifacts are not a production release. Future releases must include immutable archives, SHA-256 checksums, installation checks and build provenance. Source platform changes and production deployment are reviewed separately; this repository contains no deployment secrets or operator credentials.
-
-## Build and review the runtime source
-
-The source in this repository is independently buildable and includes its tests and locked dependencies. With Node.js >=22 installed, run `npm ci --ignore-scripts`, `npm run typecheck`, `npm test`, then `npm run build`. The local MCP command is `node /ABSOLUTE/PATH/dist/cli.js --api https://app.jump.family --chain-id 56 mcp`. Startup alone grants no wallet access; production preparation and coordination must be deployed before any transaction can execute.
-
-`npm run release:public` creates development artifacts under `release/`; `python3 scripts/verify-public-release.py` checks an isolated install. Formal candidate packaging requires a clean checkout at a matching version tag. CI records build provenance; public release publication remains a separate step.

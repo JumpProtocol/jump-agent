@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { decodeFunctionData, zeroAddress } from 'viem';
 import type { Address } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { Store, sessionKey } from '../src/store';
+import { Store, sessionKey, submissionKey } from '../src/store';
 import { Runner, validateLoginChallenge } from '../src/runner';
 import { BinanceWallet } from '../src/wallet';
 import { ERC20_ABI } from '../src/shared/auction';
@@ -348,5 +348,59 @@ test('dual-approved server closure synchronizes only the matching local reservat
     assert.equal((await f.runner.pending(walletAddress)).state, 'NO_LOCAL_RESERVATION');
     const next = await f.runner.preview(1, 'deposit', '0.1');
     assert.ok(next.previewId);
+  } finally { await f.cleanup(); }
+});
+
+for (const state of ['missing', 'expired'] as const) test(`${state} Jump login leaves preview reusable without a submission guard`, async () => {
+  const f = await fixture();
+  try {
+    const preview = await f.runner.preview(1, 'deposit', '0.1');
+    const key = sessionKey(f.runner.api.base, 56, walletAddress);
+    if (state === 'missing') await f.store.remove(key);
+    else await f.store.put(key, { token: 'synthetic-expired-token', expiresAt: Date.now() - 1000 });
+    let requests = 0;
+    const request = f.runner.api.request.bind(f.runner.api);
+    f.runner.api.request = async (...args) => { requests++; return request(...args); };
+    await assert.rejects(() => f.runner.execute(preview.previewId, preview.confirmDigest), /login expired/);
+    assert.equal(requests, 0);
+    assert.equal(f.calls.filter(c => c[1] === 'execute').length, 0);
+    assert.equal(await f.store.isClaimed(preview.previewId), false);
+    assert.equal(await f.store.optional(submissionKey(56, walletAddress)), undefined);
+    assert.equal((await f.store.get(preview.previewId)).state, 'previewed');
+    await f.store.put(key, { token: 'synthetic-refreshed-token', expiresAt: Date.now() + 1800_000 });
+    await f.runner.execute(preview.previewId, preview.confirmDigest);
+    assert.equal(f.calls.filter(c => c[1] === 'execute').length, 1);
+  } finally { await f.cleanup(); }
+});
+
+for (const failure of ['401', '409', '429', 'network', 'invalid-response'] as const) test(`reservation ${failure} before dispatch closes only the unsubmitted local guard`, async () => {
+  const f = await fixture();
+  try {
+    const p = await f.runner.preview(1, 'deposit', '0.1');
+    let dispatches = 0;
+    f.runner.api.request = async path => {
+      if (path.endsWith('/dispatch')) dispatches++;
+      if (failure === 'invalid-response') return { operation_id: 'invalid' };
+      throw new Error(failure);
+    };
+    await assert.rejects(() => f.runner.execute(p.previewId, p.confirmDigest));
+    assert.equal(dispatches, 0);
+    assert.equal(f.calls.filter(c => c[1] === 'execute').length, 0);
+    assert.equal((await f.store.get(p.previewId)).state, 'NOT_SUBMITTED');
+    assert.equal(await f.store.isClaimed(p.previewId), true);
+    assert.equal(await f.store.optional(submissionKey(56, walletAddress)), undefined);
+    await assert.rejects(() => f.runner.execute(p.previewId, p.confirmDigest), /already submitted/);
+    assert.ok((await f.runner.preview(1, 'deposit', '0.1')).previewId);
+  } finally { await f.cleanup(); }
+});
+
+test('two simultaneous previews for one wallet cannot both submit', async () => {
+  const f = await fixture();
+  try {
+    const first = await f.runner.preview(1, 'deposit', '0.1');
+    const second = await f.runner.preview(1, 'deposit', '0.2');
+    const outcomes = await Promise.allSettled([f.runner.execute(first.previewId, first.confirmDigest), f.runner.execute(second.previewId, second.confirmDigest)]);
+    assert.equal(outcomes.filter(r => r.status === 'fulfilled').length, 1);
+    assert.equal(f.calls.filter(c => c[1] === 'execute').length, 1);
   } finally { await f.cleanup(); }
 });

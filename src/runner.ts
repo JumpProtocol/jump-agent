@@ -240,6 +240,8 @@ export class Runner {
     } else if (plan.kind === 'login') {
       validateLoginChallenge(plan.challenge, wallet, chainId(this.options), this.options.audience);
     } else throw new Error('Invalid preview kind');
+    // Validate locally available credentials before creating an irreversible submission guard.
+    const coordinationToken = plan.kind === 'transaction' ? await this.session(wallet) : undefined;
     if (plan.expiresAt <= Date.now()) throw new Error('Preview expired during validation; preview again');
     // Claim on disk BEFORE signing/broadcast. A crash or timeout leaves an uncertain record, never an automatic retry.
     if (plan.kind === 'transaction') await this.store.reserve(submissionKey(plan.chainId, wallet), id);
@@ -254,15 +256,25 @@ export class Runner {
     if (plan.kind === 'transaction') {
       // Fail closed: every updated installation and hosted session shares this SQL guard.
       // Persist the reservation ID before requesting dispatch; an ambiguous ACK is never retried.
-      const token = await this.session(wallet);
-      const reservation = await this.api.request('/agent/v1/reservations', { token, body: {
-        chain_id: plan.chainId, token_id: plan.tokenId, action: plan.action,
-        ...(plan.amount !== undefined ? { amount: plan.amount } : {}),
-        call: plan.call, provider_request_id: plan.provider.requestId,
-      } });
-      if (typeof reservation.operation_id !== 'string' || !/^[a-f0-9-]{36}$/.test(reservation.operation_id)) throw new Error('Invalid shared reservation; no wallet execute requested');
-      record.remoteOperationId = reservation.operation_id;
-      await this.store.put(id, record);
+      const token = coordinationToken!;
+      try {
+        const reservation = await this.api.request('/agent/v1/reservations', { token, body: {
+          chain_id: plan.chainId, token_id: plan.tokenId, action: plan.action,
+          ...(plan.amount !== undefined ? { amount: plan.amount } : {}),
+          call: plan.call, provider_request_id: plan.provider.requestId,
+        } });
+        if (typeof reservation.operation_id !== 'string' || !/^[a-f0-9-]{36}$/.test(reservation.operation_id)) throw new Error('Invalid shared reservation; no wallet execute requested');
+        record.remoteOperationId = reservation.operation_id;
+        await this.store.put(id, record);
+      } catch (error) {
+        // No dispatch call has begun: neither the server nor this runtime can
+        // have requested signing. A server reservation may safely expire.
+        // Consume this preview, but allow a fresh preview after fixing access.
+        record.state = 'NOT_SUBMITTED';
+        record.lastError = publicError(error);
+        await this.store.complete(submissionKey(plan.chainId, wallet), id, record);
+        throw error;
+      }
       const dispatch = await this.api.request(`/agent/v1/reservations/${record.remoteOperationId}/dispatch`, { token, body: {} });
       if (dispatch.operation_id !== record.remoteOperationId || dispatch.state !== 'SUBMISSION_UNKNOWN' || dispatch.guard_active !== true) throw new Error('Shared dispatch not acknowledged; never execute or retry');
     }

@@ -1,3 +1,4 @@
+import fsNative from 'fs-native-extensions';
 import { constants } from 'node:fs';
 import { chmod, lstat, mkdir, open, opendir, rename, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -63,10 +64,20 @@ export class Store {
 
   async locked<T>(key: string, action: () => Promise<T>): Promise<T> {
     await this.init();
-    const path = `${this.path(key)}.lock`;
-    const lock = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
-    try { return await action(); }
-    finally { await lock.close(); await rm(path); await this.syncDirectory(); }
+    // Legacy O_EXCL lock files are not automatically removed: an old runtime
+    // might still own them. Stop legacy clients and inspect before migration.
+    try { await lstat(`${this.path(key)}.lock`); throw new Error('Legacy local lock requires operator inspection with old clients stopped'); }
+    catch (error: any) { if (error.code !== 'ENOENT') throw error; }
+    // Stable inode: never unlink this file. The kernel releases its advisory
+    // lock on descriptor close or process death, including SIGKILL.
+    const lock = await open(`${this.path(key)}.mutex`, constants.O_RDWR | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600);
+    try {
+      const stat = await lock.stat();
+      if (!stat.isFile() || (stat.mode & 0o077) || (process.getuid && stat.uid !== process.getuid())) throw new Error('Unsafe local mutex');
+      if (!fsNative.tryLock(lock.fd)) throw Object.assign(new Error('Local operation is busy'), { code: 'EEXIST' });
+      return await action();
+    } finally { await lock.close(); }
+
   }
 
   async update(key: string, change: (current: any) => any) {

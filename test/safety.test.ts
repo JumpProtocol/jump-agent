@@ -1,3 +1,5 @@
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmod, mkdtemp, rm, stat, symlink } from 'node:fs/promises';
@@ -95,4 +97,28 @@ test('wrong-chain RPC is rejected before token/deployment lookup', async () => {
     await assert.rejects(() => r.context(1), /RPC chain mismatch/);
     assert.equal(calls, 1);
   } finally { globalThis.fetch = old; }
+});
+
+test('process death releases only the OS mutex and preserves submission evidence', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'jump-mutex-crash-'));
+  const store = new Store(dir);
+  let child: ReturnType<typeof spawn> | undefined;
+  try {
+    await store.put('wallet', { previewId: 'original-preview' });
+    await store.claim('original-preview');
+    const program = `import { open } from 'node:fs/promises';
+      import native from 'fs-native-extensions';
+      const fd = await open(process.argv[1], 'a+', 0o600);
+      if (!native.tryLock(fd.fd)) process.exit(2);
+      console.log('LOCKED');
+      setInterval(() => {}, 1000);`;
+    child = spawn(process.execPath, ['--input-type=module', '-e', program, join(dir, 'wallet.json.mutex')], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const output = await Promise.race([once(child.stdout!, 'data'), once(child, 'exit').then(() => { throw new Error('Mutex child exited early'); })]);
+    assert.match(String(output[0]), /LOCKED/);
+    await assert.rejects(() => store.locked('wallet', async () => true), /busy/);
+    const exited = once(child, 'exit'); child.kill('SIGKILL'); await exited;
+    assert.equal(await store.locked('wallet', async () => true), true);
+    assert.equal((await store.get('wallet')).previewId, 'original-preview');
+    assert.equal(await store.isClaimed('original-preview'), true);
+  } finally { child?.kill('SIGKILL'); await rm(dir, { recursive: true }); }
 });
