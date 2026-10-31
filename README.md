@@ -2,7 +2,7 @@
 
 Official Skill and local MCP distribution channel for [Jump](https://app.jump.family/).
 
-This repository is a public integration preview. The BSC mainnet preview at https://app.jump.family now exposes Agent v1 preparation and hosted wallet pairing/execution; check its capabilities before use. Real wallet signing, approval, deposit, claim and refund acceptance remains pending. Never treat a successful local test, downloaded Skill, or connected QR as permission to spend.
+This repository is a public integration preview. The BSC mainnet preview at https://app.jump.family now exposes Agent v1 preparation and hosted wallet pairing/execution; check its capabilities before use. Hosted mainnet signed login and a native BNB deposit/full withdrawal have been verified. Local-runtime wallet execution, ERC20 approval and positive claim/cancelled/deferred-refund paths still require separate live acceptance. Never treat a successful local test, downloaded Skill, or connected QR as permission to spend.
 
 ## Install the Skill
 
@@ -10,7 +10,7 @@ Download `SKILL.md` from this repository and install it using your agent client'
 
 ## Local MCP
 
-The MCP runtime runs locally with Node.js 22 or later and uses the separately installed official Binance `baw` CLI. The tagged v0.1.0 preview archive is served by the website release manifest, with immutable hash paths and checksums. There is no published npm package or hosted MCP endpoint. Do not use an invented npm name, remote MCP URL, or repository-relative `agent/dist/cli.js` path.
+The MCP runtime runs locally with Node.js 22 or later and uses the separately installed official Binance `baw` CLI. The tagged v0.1.1 preview archive is served by the website release manifest, with immutable hash paths and checksums. There is no published npm package or hosted MCP endpoint. Do not use an invented npm name, remote MCP URL, or repository-relative `agent/dist/cli.js` path.
 
 ## Safety
 
