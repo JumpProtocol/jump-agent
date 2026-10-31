@@ -2,7 +2,7 @@
 
 Official Skill and local MCP distribution channel for [Jump](https://app.jump.family/).
 
-This repository is a public integration preview. Production Agent v1 API and transaction execution are not enabled at initial publication. Real wallet signing, approval, deposit, claim and refund acceptance remains pending. Never treat a successful local test, downloaded Skill, or connected QR as permission to spend.
+This repository is a public integration preview. The BSC mainnet preview at https://app.jump.family now exposes Agent v1 preparation and hosted wallet pairing/execution; check its capabilities before use. Real wallet signing, approval, deposit, claim and refund acceptance remains pending. Never treat a successful local test, downloaded Skill, or connected QR as permission to spend.
 
 ## Install the Skill
 
@@ -10,7 +10,7 @@ Download `SKILL.md` from this repository and install it using your agent client'
 
 ## Local MCP
 
-The MCP runtime runs locally with Node.js 22 or later and uses the separately installed official Binance `baw` CLI. A versioned, verified runtime archive will be published through GitHub Releases after the release gate passes. There is no published npm package or hosted MCP endpoint. Do not use an invented npm name, remote MCP URL, or repository-relative `agent/dist/cli.js` path.
+The MCP runtime runs locally with Node.js 22 or later and uses the separately installed official Binance `baw` CLI. The tagged v0.1.0 preview archive is served by the website release manifest, with immutable hash paths and checksums. There is no published npm package or hosted MCP endpoint. Do not use an invented npm name, remote MCP URL, or repository-relative `agent/dist/cli.js` path.
 
 ## Safety
 
@@ -25,7 +25,7 @@ The MCP runtime runs locally with Node.js 22 or later and uses the separately in
 
 ## Release status
 
-No production runtime release has been published. Local development artifacts are not a production release. Future releases must include immutable archives, SHA-256 checksums, installation checks and build provenance. Source platform changes and production deployment are reviewed separately; this repository contains no deployment secrets or operator credentials.
+A tagged preview candidate is available through https://app.jump.family/agent-distribution/manifest.json. It is not an npm package or a claim of live-wallet acceptance. Local development artifacts remain unsuitable for production. Future releases must include immutable archives, SHA-256 checksums, installation checks and build provenance. Source platform changes and production deployment are reviewed separately; this repository contains no deployment secrets or operator credentials.
 
 ## Build and review the runtime source
 
