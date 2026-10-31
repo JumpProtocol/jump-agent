@@ -8,7 +8,7 @@ import { decodeFunctionData, zeroAddress } from 'viem';
 import type { Address } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { Store, sessionKey, submissionKey } from '../src/store';
-import { Runner, validateLoginChallenge } from '../src/runner';
+import { Runner, validateLoginChallenge, expectedAudience } from '../src/runner';
 import { BinanceWallet } from '../src/wallet';
 import { ERC20_ABI } from '../src/shared/auction';
 import { AgentError } from '../src/errors';
@@ -403,4 +403,11 @@ test('two simultaneous previews for one wallet cannot both submit', async () => 
     assert.equal(outcomes.filter(r => r.status === 'fulfilled').length, 1);
     assert.equal(f.calls.filter(c => c[1] === 'execute').length, 1);
   } finally { await f.cleanup(); }
+});
+
+test('production login audience is pinned to the configured origin unless explicitly overridden', () => {
+  assert.equal(expectedAudience('https://app.jump.family'), 'https://app.jump.family');
+  assert.equal(expectedAudience('http://127.0.0.1:8080'), 'jump-platform');
+  assert.equal(expectedAudience('https://example.com', 'configured-audience'), 'configured-audience');
+  assert.throws(() => expectedAudience('http://remote.example'));
 });

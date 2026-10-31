@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command, Option } from 'commander';
 import { createPublicClient, http, getAddress } from 'viem';
-import { Runner, chainId, json } from './runner';
+import { Runner, expectedAudience, chainId, json } from './runner';
 import { safeUrl } from './api';
 import { Store, sessionKey } from './store';
 import type { Options } from './runner';
@@ -15,8 +15,11 @@ program
   .addOption(new Option('--rpc <url>', 'User-selected read-only RPC').env('JUMP_RPC_URL'))
   .addOption(new Option('--engine <address>', 'Pinned AuctionEngine proxy').env('JUMP_AUCTION_ENGINE'))
   .addOption(new Option('--factory <address>', 'Pinned LaunchFactory proxy').env('JUMP_LAUNCH_FACTORY'))
-  .addOption(new Option('--audience <name>', 'Expected Jump login audience').env('JUMP_AUTH_AUDIENCE').default('jump-platform'));
-const runner = () => new Runner(program.opts<Options>());
+  .addOption(new Option('--audience <name>', 'Expected Jump login audience').env('JUMP_AUTH_AUDIENCE'));
+const runner = () => {
+  const options = program.opts<Options>();
+  return new Runner({ ...options, audience: expectedAudience(options.api, options.audience) });
+};
 const output = (data: unknown) => { process.stdout.write(JSON.stringify({ success: true, data: json(data) }) + '\n'); };
 
 program.command('doctor').description('Check pinned API/RPC deployment and private local storage without contacting a wallet').action(async () => {

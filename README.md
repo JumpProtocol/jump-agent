@@ -26,3 +26,9 @@ The MCP runtime runs locally with Node.js 22 or later and uses the separately in
 ## Release status
 
 No production runtime release has been published. Local development artifacts are not a production release. Future releases must include immutable archives, SHA-256 checksums, installation checks and build provenance. Source platform changes and production deployment are reviewed separately; this repository contains no deployment secrets or operator credentials.
+
+## Build and review the runtime source
+
+The source in this repository is independently buildable and includes its tests and locked dependencies. With Node.js >=22 installed, run `npm ci --ignore-scripts`, `npm run typecheck`, `npm test`, then `npm run build`. The local MCP command is `node /ABSOLUTE/PATH/dist/cli.js --api https://app.jump.family --chain-id 56 mcp`. Startup alone grants no wallet access; production preparation and coordination must be deployed before any transaction can execute.
+
+`npm run release:public` creates development artifacts under `release/`; `python3 scripts/verify-public-release.py` checks an isolated install. Formal candidate packaging requires a clean checkout at a matching version tag. CI records build provenance; public release publication remains a separate step.

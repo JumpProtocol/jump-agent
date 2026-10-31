@@ -26,6 +26,12 @@ const IMPLEMENTATION_SLOT = '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a92
 export const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const json = (value: unknown) => JSON.parse(JSON.stringify(value, (_k, v) => typeof v === 'bigint' ? v.toString() : v));
 
+export function expectedAudience(api: string, override?: string): string {
+  if (override) return override;
+  const url = safeUrl(api);
+  return ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) ? 'jump-platform' : url.origin;
+}
+
 export function chainId(options: Options) {
   const id = Number(options.chainId);
   if (![56, 97].includes(id)) throw new Error('Jump supports only BSC 56 and 97');
