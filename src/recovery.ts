@@ -22,6 +22,7 @@ export function journalEntry(previewId: string, record: any) {
   return { previewId, kind: plan.kind, chainId: plan.chainId, wallet: plan.wallet,
     tokenId: plan.tokenId, action: plan.action, state: record.state, expiresAt: plan.expiresAt,
     submittedAt: record.submittedAt, orderId: record.result?.orderId, txHash: record.result?.txHash,
+    ...(record.createdLaunch ? { createdLaunch: { token_id: record.createdLaunch.token_id, launch_id: record.createdLaunch.launch_id, token_address: record.createdLaunch.token_address } } : {}),
     errorCode: typeof record.lastError?.code === 'string' ? record.lastError.code : undefined,
     nextAction: nextAction(record.state, plan.kind, !!record.result?.txHash) };
 }

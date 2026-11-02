@@ -16,7 +16,7 @@ See [client installation](references/installation.md) for Codex, Claude Code and
 
 ## Local MCP
 
-The MCP runtime runs locally with Node.js 22 or later and uses the separately installed official Binance `baw` CLI. The tagged v0.3.1 preview archive is served by the website release manifest, with immutable hash paths and checksums. There is no published npm package . Remote MCP is separately announced by deployment capabilities. Do not use an invented npm name, unverified endpoint, or repository-relative `agent/dist/cli.js` path.
+The MCP runtime runs locally with Node.js 22 or later and uses the separately installed official Binance `baw` CLI. The tagged v0.4.0 preview archive is served by the website release manifest, with immutable hash paths and checksums. There is no published npm package . Remote MCP is separately announced by deployment capabilities. Do not use an invented npm name, unverified endpoint, or repository-relative `agent/dist/cli.js` path.
 
 ## Safety
 
@@ -39,7 +39,13 @@ Local runtime host compatibility: validated on macOS and Linux with glibc (inclu
 
 ## Create and manage launches
 
-With explicit `jump:launch` consent, the remote wallet connection also provides six creator tools: create/list/update/cancel drafts, request launch, and request creator fees. Ask your Agent to prepare the launch terms, then open Jump’s confirmation page to review and sign. No platform creation fee is charged; network Gas remains. Existing live launches can update off-chain metadata only. The local CLI does not include creator commands. See the installed Jump Skill for parameters and revision/idempotency rules.
+With explicit `jump:launch` consent, the remote wallet connection also provides six creator tools: create/list/update/cancel drafts, request launch, and request creator fees. Ask your Agent to prepare the launch terms, then open Jump’s confirmation page to review and sign. No platform creation fee is charged; network Gas remains. Existing live launches can update off-chain metadata only. Local MCP v0.4.0+ provides the same draft-management tools and `jump_action_preview` for creation, creator fees, auction deposits (including configured payment conversions), withdrawals, claims and refunds. Confirm the concrete preview in chat and use `jump_execute`; no Jump webpage is required. Binance App approval may still be required. Local execution is implemented and tested, but its live-wallet acceptance remains pending. See the installed Jump Skill for parameters and revision/idempotency rules.
+
+## Complete operations in chat
+
+Use the local stdio MCP plus official Binance baw when you want the Agent to execute without opening Jump. After one-time installation, wallet pairing and signed Jump login, ask it to prepare a launch, contribute, withdraw, or collect eligible allocations/refunds/creator fees. Review the concrete preview in chat and confirm; the Agent executes and tracks the original receipt. A broad goal does not grant unattended spending. Remote HTTP MCP remains a separate browser-handoff option.
+
+Local business tools: `jump_create_launch_draft`, `jump_creator_launches`, `jump_update_launch_metadata`, `jump_cancel_launch_draft`, `jump_action_preview`. Creator and converted-payment previews persist a server-owned frozen plan before the local wallet preview. Execution revalidates that plan and takes the shared wallet/chain guard before dispatch. Expired/changed plans fail closed. An unknown broadcast is never replaced automatically. Creation still has zero platform fee and requires network gas.
 
 ## Build and review the runtime source
 

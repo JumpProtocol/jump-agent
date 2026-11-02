@@ -1,5 +1,5 @@
 {
-  "source_commit": "71ed36b7fa8ed4d143447f3e663ad21c9866ac34",
+  "source_commit": "399f03feace714a0985a2fdc8f2ca9622ad13698",
   "source_working_tree_dirty": false,
   "export": "explicit CLI/MCP, tests, pure shared helpers and ABI allowlist; no platform/backend service or environment files",
   "live_wallet_acceptance": "pending"

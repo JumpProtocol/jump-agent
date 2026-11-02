@@ -20,10 +20,10 @@ After setup, ask the Agent to call `jump_capabilities` and `jump_list`. Wallet a
 
 Client documentation: https://learn.chatgpt.com/docs/extend/mcp · https://code.claude.com/docs/en/mcp · https://docs.openclaw.ai/tools/mcp.
 
-## Optional standalone local runtime
+## Local runtime: execute inside chat without a Jump webpage
 
 
-The Skill can read HTTP without this runtime. Signing/execution uses the standalone runtime's preview, confirmation and durable wallet reservation. Never replace it with a direct, unguarded execute command.
+Choose this mode when the user wants to operate entirely in their Agent conversation. The Skill can read HTTP without this runtime. Signing/execution uses the standalone runtime's preview, confirmation and durable wallet reservation. Never replace it with a direct, unguarded execute command.
 
 1. Obtain the trusted deployment origin from the user. Request `/agent-distribution/manifest.json` there. If it is unavailable, stop rather than inventing a package or URL. Localhost works only on the machine serving Jump; it is not a production service.
 2. The manifest supplies version, Node requirement, relative runtime/skill paths and SHA-256. Resolve artifact paths only against that same trusted origin. Reject another origin, credentials, redirects or unexpected paths. A checksum from that same origin detects corruption, not an independently compromised publisher. Ask the user to approve installing software before downloading/extracting it into their selected runtime directory.
@@ -43,4 +43,4 @@ Unapproved client registrations expire after 10 minutes. After a first successfu
 
 ### Creator access
 
-The remote wallet endpoint can expose six creator tools when the deployment enables `creator_tools` and the owner grants `jump:launch`: `jump_create_launch_draft`, `jump_creator_launches`, `jump_update_launch_metadata`, `jump_cancel_launch_draft`, `jump_request_launch`, `jump_request_creator_fees`. Reauthorize existing clients to consent to the new scope. Creating a draft does not create a chain transaction. Launch and creator-fee requests return a browser confirmation link; the owner confirms each exact preview personally. Platform creation fee is zero; network Gas remains. Local CLI/stdio creator commands are not provided.
+The remote wallet endpoint can expose six creator tools when the deployment enables `creator_tools` and the owner grants `jump:launch`: `jump_create_launch_draft`, `jump_creator_launches`, `jump_update_launch_metadata`, `jump_cancel_launch_draft`, `jump_request_launch`, `jump_request_creator_fees`. Reauthorize existing clients to consent to the new scope. Creating a draft does not create a chain transaction. Launch and creator-fee requests return a browser confirmation link; the owner confirms each exact preview personally. Platform creation fee is zero; network Gas remains. Local stdio MCP v0.4.0+ instead exposes the four draft-management tools plus `jump_action_preview` for creation, creator fees and auction actions. It authenticates with the locally signed Agent login and executes after confirmation in chat; no remote OAuth or Jump confirmation page is needed. Wallet-required Binance App approval remains. The CLI equivalent is `action-preview --token-id ID --action create-launch --draft-revision REVISION`, followed by the existing exact-digest `execute` command.

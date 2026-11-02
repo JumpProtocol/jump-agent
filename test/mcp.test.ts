@@ -9,6 +9,8 @@ import { Runner } from '../src/runner';
 test('MCP negotiates, exposes safe tools, validates input and reuses Runner', async () => {
   const calls: unknown[] = [];
   const runner = { list: async (page: number) => { calls.push(page); return { items: [] }; },
+    creator: async (path: string, body: unknown) => { calls.push({ path, body }); return { token_id: 1, revision: 1 }; },
+    actionPreview: async (intent: unknown) => { calls.push(intent); return { previewId: 'preview-only' }; },
     execute: async () => { throw new Error('Preview changed or already submitted; do not retry'); } } as unknown as Runner;
   const server = createMcpServer(runner);
   const client = new Client({ name: 'jump-test', version: '1' });
@@ -17,7 +19,7 @@ test('MCP negotiates, exposes safe tools, validates input and reuses Runner', as
   await client.connect(b);
   try {
     const { tools } = await client.listTools();
-    assert.equal(tools.length, 15);
+    assert.equal(tools.length, 20);
     assert.equal(tools.find(t => t.name === 'jump_execute')?.annotations?.readOnlyHint, false);
     assert.equal(tools.find(t => t.name === 'jump_list')?.annotations?.readOnlyHint, true);
     const result = await client.callTool({ name: 'jump_list', arguments: { page: 2 } });
@@ -26,6 +28,17 @@ test('MCP negotiates, exposes safe tools, validates input and reuses Runner', as
     const invalid = await client.callTool({ name: 'jump_list', arguments: { page: -1, api: 'https://attacker.example' } });
     assert.equal(invalid.isError, true);
     assert.deepEqual(calls, [2]);
+    const draft = await client.callTool({ name: 'jump_create_launch_draft', arguments: {
+      clientRequestId: '00000000-0000-4000-8000-000000000001', name: 'Local', symbol: 'LOC' } });
+    assert.equal(draft.isError, undefined);
+    assert.equal((calls[1] as any).path, '/drafts');
+    assert.equal((calls[1] as any).body.name, 'Local');
+    const launch = await client.callTool({ name: 'jump_action_preview', arguments: { tokenId: 1, action: 'create-launch', draftRevision: 1 } });
+    assert.equal(launch.isError, undefined);
+    assert.deepEqual(calls[2], { token_id: 1, action: 'create-launch', draft_revision: 1 });
+    const arbitrary = await client.callTool({ name: 'jump_action_preview', arguments: { tokenId: 1, action: 'create-launch', draftRevision: 1, to: '0x' + '22'.repeat(20) } });
+    assert.equal(arbitrary.isError, true);
+    assert.equal(calls.length, 3);
     const denied = await client.callTool({ name: 'jump_execute', arguments: { previewId: '00000000-0000-4000-8000-000000000001', confirmDigest: 'a'.repeat(64) } });
     assert.equal(denied.isError, true);
   } finally { await client.close(); await server.close(); }

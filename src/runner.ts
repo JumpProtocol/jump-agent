@@ -216,6 +216,48 @@ export class Runner {
     return { previewId: id, confirmDigest: digest(plan), ...plan };
   }
 
+  /** Business plans are constructed and frozen by Jump, then simulated by the local wallet. */
+  async actionPreview(intent: { token_id: number; action: string; amount?: string; payment_asset?: string; draft_revision?: number; fee_asset?: string }) {
+    const chain = chainId(this.options);
+    const { address: wallet } = await this.wallet.preflight(chain);
+    if (await this.store.optional(submissionKey(chain, wallet))) throw new Error('Unresolved submission; reconcile before another preview');
+    const client = await this.rpcClient();
+    const deployment = await this.deployment(client);
+    const prepared = await this.api.request('/agent/v1/local/plans', {
+      token: await this.session(wallet), body: { ...intent, chain_id: chain },
+    });
+    const parsed = z.object({ plan_id: z.string().uuid(), chain_id: z.literal(chain), wallet: address,
+      expires_at: z.number().int().positive(), transaction: z.object({
+        call: z.object({ from: address, to: address, data: z.string().regex(/^0x([a-fA-F0-9]{2})*$/).max(20000), value: rawAmount.max(78) }),
+        detail: z.record(z.string(), z.unknown()), method: z.string(),
+      }), confirmation_required: z.literal(true), submitted: z.literal(false) }).parse(prepared);
+    if (parsed.wallet !== wallet || parsed.transaction.call.from !== wallet || parsed.expires_at <= Date.now()) throw new Error('Prepared plan identity or expiry mismatch');
+    const call = { to: parsed.transaction.call.to, data: parsed.transaction.call.data as Hex, value: uint(parsed.transaction.call.value) };
+    const [gas, gasPrice, balance] = await Promise.all([
+      client.estimateGas({ account: wallet, ...call }), client.getGasPrice(), client.getBalance({ address: wallet }),
+    ]);
+    if (balance < call.value + gas * gasPrice) throw new Error('Insufficient BNB for value plus estimated gas');
+    const provider = await this.wallet.call(['contract-call', 'preview', '--binanceChainId', String(chain),
+      '--from', wallet, '--to', call.to, '--value', String(call.value), '--inputData', call.data]);
+    const simulation = provider.simulationResult;
+    if (!simulation || simulation.simulationCode !== '000000000' || simulation.simulationErrorDetail) throw new Error('Wallet simulation did not pass');
+    const plan = json({ kind: 'transaction', api: this.api.base, chainId: chain, wallet,
+      tokenId: intent.token_id, action: intent.action, amount: intent.amount, call, intent,
+      preparedPlanId: parsed.plan_id, deploymentFingerprint: deployment.fingerprint,
+      detail: parsed.transaction.detail, method: parsed.transaction.method, gas, gasPrice, provider,
+      expiresAt: Math.min(parsed.expires_at, previewExpiry(provider)) });
+    if (plan.expiresAt <= Date.now()) throw new Error('Preview expired during preparation; preview again');
+    const id = randomUUID();
+    await this.store.put(id, { plan, digest: digest(plan), state: 'previewed' });
+    return { previewId: id, confirmDigest: digest(plan), ...plan };
+  }
+
+  async creator(path: string, body?: unknown) {
+    if (!/^\/drafts(?:\/[1-9]\d*(?:\/(?:metadata|cancel))?)?(?:\?page=[1-9]\d{0,2}|\?page=1000)?$/.test(path)) throw new Error('Invalid creator resource');
+    const wallet = await this.wallet.identity(chainId(this.options));
+    return this.api.request(`/agent/v1/local/creator${path}`, { token: await this.session(wallet), ...(body === undefined ? {} : { body }) });
+  }
+
   async loginPreview() {
     const { address: wallet } = await this.wallet.preflight(chainId(this.options));
     const challenge = await this.api.request('/auth/agent/challenge', { body: { wallet_address: wallet, chain_id: chainId(this.options) } });
@@ -237,7 +279,12 @@ export class Runner {
     const { address: wallet } = await this.wallet.preflight(chainId(this.options));
     if (plan.wallet !== wallet) throw new Error('Wallet changed; preview again');
     if (plan.kind === 'transaction') {
-      const { c, call } = await this.prepare(plan.tokenId, plan.action, wallet, plan.amount);
+      const prepared = plan.preparedPlanId ? await (async () => {
+        const client = await this.rpcClient();
+        const deployment = await this.deployment(client);
+        return { c: { client, fingerprint: deployment.fingerprint }, call: { ...plan.call, value: uint(plan.call.value) } };
+      })() : await this.prepare(plan.tokenId, plan.action, wallet, plan.amount);
+      const { c, call } = prepared;
       if (c.fingerprint !== plan.deploymentFingerprint || digest(json(call)) !== digest(plan.call)) throw new Error('Deployment or required transaction changed; preview again');
       const [gas, gasPrice, balance] = await Promise.all([
         c.client.estimateGas({ account: wallet, ...call }), c.client.getGasPrice(), c.client.getBalance({ address: wallet }),
@@ -264,7 +311,7 @@ export class Runner {
       // Persist the reservation ID before requesting dispatch; an ambiguous ACK is never retried.
       const token = coordinationToken!;
       try {
-        const reservation = await this.api.request('/agent/v1/reservations', { token, body: {
+        const reservation = await this.api.request(plan.preparedPlanId ? `/agent/v1/local/plans/${plan.preparedPlanId}/reserve` : '/agent/v1/reservations', { token, body: plan.preparedPlanId ? { call: plan.call, provider_request_id: plan.provider.requestId } : {
           chain_id: plan.chainId, token_id: plan.tokenId, action: plan.action,
           ...(plan.amount !== undefined ? { amount: plan.amount } : {}),
           call: plan.call, provider_request_id: plan.provider.requestId,
@@ -343,7 +390,7 @@ export class Runner {
     if (record.plan.api !== this.api.base || record.plan.chainId !== chainId(this.options)) throw new Error('Preview scope mismatch');
     if (digest(record.plan) !== record.digest) throw new Error('Stored preview changed');
     if (record.state === 'previewed' && await this.store.isClaimed(id)) record.state = 'submission-unknown';
-    if (record.state === 'MANUALLY_CLOSED') return journalEntry(id, record);
+    if (['MANUALLY_CLOSED', 'CONFIRMED', 'REVERTED'].includes(record.state)) return journalEntry(id, record);
     if (record.plan.kind === 'transaction' && record.remoteOperationId) {
       const shared = await this.reportRemote(record, false);
       if (shared.state === 'MANUALLY_CLOSED' && shared.guard_active === false) {
@@ -392,13 +439,16 @@ export class Runner {
     const confirmations = head - receipt.blockNumber + 1n;
     if (confirmations < 12n) return json({ state: 'AWAITING_CONFIRMATIONS', confirmations, required: 12, txHash: hash });
     if (receipt.status !== 'success' && receipt.status !== 'reverted') throw new Error('Unknown receipt status');
+    let createdLaunch;
     if (record.remoteOperationId) {
       const shared = await this.reportRemote(record, true);
+      createdLaunch = shared.created_launch;
       if (shared.guard_active || !['CONFIRMED', 'REVERTED'].includes(shared.state)) throw new Error('Shared receipt verification is still pending; wallet reservation retained');
     }
     record.state = receipt.status === 'success' ? 'CONFIRMED' : 'REVERTED';
+    if (createdLaunch) record.createdLaunch = createdLaunch;
     await this.store.complete(submissionKey(plan.chainId, plan.wallet), id, record);
-    return json({ state: record.state, confirmations, txHash: hash });
+    return json({ state: record.state, confirmations, txHash: hash, ...(createdLaunch ? { createdLaunch } : {}) });
   }
 
   async preflight() {

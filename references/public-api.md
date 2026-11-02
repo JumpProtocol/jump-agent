@@ -13,4 +13,14 @@ Use the user-selected trusted HTTPS origin as the base. Interpret `{code,data,ms
 
 Preparation actions: `deposit`, `withdraw`, `claim`, `cancelled-refund`, `deferred-refund`. Only deposit/withdraw take amount; claim needs an available canonical allocation proof. Check the deployment capability flag before requesting a plan. A plan's digest does not approve anything. Use the installed runtime to create its own fresh provider preview and durable execution guard; do not directly broadcast an old HTTP plan or bypass the runtime's unresolved submission lock.
 
-Website `/api/agent-wallet/*` is a separate browser-cookie session with Origin checks. Do not reuse its cookies or treat it as a public remote signer. Launch creation, staking, secondary trading, .ai resolution and automatic scheduling are outside this first integration.
+Website `/api/agent-wallet/*` is a separate browser-cookie session with Origin checks. Do not reuse its cookies or treat it as a public remote signer. Local creator tools are described below. Staking, secondary trading and automatic scheduling are not offered by this runtime; `.ai` lookup is read-only.
+
+## Local execution APIs (runtime v0.4.0+)
+
+These endpoints require the existing wallet-signed, audience/chain-scoped Agent JWT, never a browser cookie or remote OAuth token. Check `local_mcp.enabled` before use.
+
+- `POST /api/agent/v1/local/plans`: named intent (`chain_id`, database `token_id`, `action`, and applicable `amount`, `payment_asset`, `draft_revision`, `fee_asset`). Supports auction actions plus enabled `create-launch` / `claim-creator-fees`. Arbitrary destinations, calldata, recipients and frozen authorization fields are rejected. Returns an expiring server-stored plan ID and unsigned wallet call, never broadcasts.
+- `POST /api/agent/v1/local/plans/{plan_id}/reserve`: exact `call` and wallet `provider_request_id`. Revalidates the original frozen intent, nonce, deployment fingerprint, expiry and owner before acquiring the shared wallet guard. Use the existing `/reservations/{id}/dispatch` and `/result` protocol; no provider call is allowed before dispatch acknowledgment.
+- `/api/agent/v1/local/creator/drafts`: GET owned records or POST an idempotent creation draft. GET `/{token_id}`, POST `/{token_id}/metadata` and `/{token_id}/cancel` reuse the creator revision/ownership rules. This cannot cancel a live on-chain auction or acquire protocol operator privileges.
+
+The local runtime presents the wallet preview in chat and submits only its confirmed digest. Server preparation is not spending permission. Initial wallet pairing and any required App approval are separate.

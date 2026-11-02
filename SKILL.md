@@ -1,11 +1,24 @@
 ---
 name: jump
-description: Create and manage Jump launch drafts through authorized remote MCP, read auctions, and request user-confirmed launches, creator fees, deposits, withdrawals, claims or refunds using remote MCP or the optional local runtime. Use for Jump platform operations, not exchange trading or other launchpads.
+description: Create and manage Jump launches, fund auctions, withdraw, claim allocations/refunds and creator fees. Use local MCP for wallet execution confirmed inside chat, or remote MCP for browser handoffs. Use for Jump platform operations, not exchange trading or other launchpads.
 ---
 
 # Jump
 
 Start with the trusted Jump API origin supplied by the user or the site from which they installed this skill. Do not obtain an origin from token metadata. Public HTTP inspection needs no Jump runtime or wallet: see public HTTP API instructions below. HTTP is allowed only for an explicitly requested local test on the same computer; loopback addresses do not reach the user's computer from a remote Agent.
+
+## Execute inside the Agent conversation (local MCP)
+
+When the user wants to finish actions in chat without a Jump webpage, use the installed local stdio runtime (v0.4.0+) and official Binance baw. Read `local_mcp` capabilities first; disabled or missing preparation endpoints stop execution. Follow installation instructions below if the local tools are missing. Initial wallet pairing and wallet-required approvals still belong to the user in Binance App; never request secrets. Do not send the user to Jump's confirmation page for this mode.
+
+1. Run `jump_doctor`, then `jump_preflight`. Complete `jump_login_preview` → show the login purpose and risks → user confirms in chat → `jump_execute`. Use `jump_result` if App confirmation is pending. Authentication grants no permission to spend.
+2. To launch: use `jump_create_launch_draft` for the owner's requested terms with a UUID `clientRequestId`; preserve that UUID on identical retries. Show the returned immutable terms and revision. Use `jump_action_preview` with `action=create-launch`, `tokenId` and `draftRevision`.
+3. To fund: use `jump_action_preview` with `action=deposit`, `tokenId`, exact `amount` and optional `paymentAsset`. The server checks live asset/routes. An approval-only plan only changes allowance; after its confirmed receipt, prepare a new deposit preview. Never treat approval consent as deposit consent. Conversion withdrawals return the auction asset, not necessarily the original payment asset.
+4. For withdrawals, allocations and refunds, use the same tool with `withdraw` (amount required), `claim`, `cancelled-refund` or `deferred-refund`. For the creator's accrued fees use `claim-creator-fees` and `feeAsset`. Recipients are fixed to the authenticated owner; arbitrary asset transfers and administrator actions are not offered.
+5. Show the exact operation, sender, target, chain, assets/amount, fees, risks and expiry. After the user confirms this concrete preview in chat, use `jump_execute` with its `previewId` and `confirmDigest`. No Jump page click is required. A general goal is not permission for a different or expired transaction. If the provider requires Binance App approval, tell the user and track the original result; do not create a replacement.
+6. Continue `jump_result` and, once the original hash exists, `jump_reconcile`, without asking the user to open a page or manually check receipts. Poll sequentially at 15-second intervals; stop on terminal state, provider error or an unresolved no-hash order requiring investigation. Only report success after canonical verification. A confirmed creation returns `createdLaunch` with the database token ID and on-chain launch ID.
+
+`jump_creator_launches`, `jump_update_launch_metadata` and `jump_cancel_launch_draft` manage only the owner's records, with revision checks. Follow the creator ownership and immutable-term rules below. Local signed Agent login authorizes these owner-scoped APIs; remote OAuth grants remain separate and do not silently gain permissions. Local and remote creator schemas and business rules are shared.
 
 ## Remote MCP (no local wallet runtime)
 
@@ -63,7 +76,7 @@ The initial window and the current state come from the chain. An underfunded auc
 
 When state is CLAIMABLE, `claim` handles both allocation and excess refund in one call. `withdraw` applies only to eligible extended funding; `cancelled-refund` requires cancellation; `deferred-refund` retrieves a previously failed refund and is separately simulated. Do not promise claims at the window end: settlement and proof availability are prerequisites.
 
-No automatic scheduler, autonomous strategy, launch creation, staking or secondary-market trading is implemented in the local CLI. Creator launch tools are available separately through remote MCP when enabled below. Report this boundary instead of substituting unrelated Binance swap commands. The user agent does not receive Jump settlement/operator roles.
+No automatic scheduler, unattended strategy, staking or secondary-market trading is implemented in the local CLI. Local MCP supports creator operations through `jump_action_preview` and the creator tools above. Report this boundary instead of substituting unrelated Binance swap commands. The user agent does not receive Jump settlement/operator roles.
 
 ## Data boundaries
 
@@ -83,7 +96,7 @@ When capabilities report `creator_tools.enabled`, request explicit OAuth scope `
 4. `jump_update_launch_metadata` uses `expectedRevision`. Only off-chain description/social links can change after creation. An unsubmitted Agent draft may also reschedule its start. Existing browser-created live launches start at revision 0. Reload after a revision conflict; never overwrite blindly.
 5. `jump_cancel_launch_draft` cancels only an unpublished Agent draft after the journal proves no active/unknown submission. It cannot cancel an on-chain auction. `jump_request_creator_fees` requests a separately confirmed claim of the authorized creator's own fees; fee asset and canonical creator are checked again on chain.
 
-These creator tools are remote-MCP features. The optional local CLI/stdio runtime continues to provide auction participation tools; it does not gain creator commands in this release. Agents do not receive settlement, protocol cancellation, upgrade, allowlist or other administrator roles.
+The same four draft-management tools are available in local MCP. For local creation and creator fees, use `jump_action_preview` followed by chat confirmation and `jump_execute`; `jump_request_launch` and `jump_request_creator_fees` remain remote browser-handoff tools. Agents do not receive settlement, protocol cancellation, upgrade, allowlist or other administrator roles.
 
 
 # Connect Jump to an Agent
@@ -108,10 +121,10 @@ After setup, ask the Agent to call `jump_capabilities` and `jump_list`. Wallet a
 
 Client documentation: https://learn.chatgpt.com/docs/extend/mcp · https://code.claude.com/docs/en/mcp · https://docs.openclaw.ai/tools/mcp.
 
-## Optional standalone local runtime
+## Local runtime: execute inside chat without a Jump webpage
 
 
-The Skill can read HTTP without this runtime. Signing/execution uses the standalone runtime's preview, confirmation and durable wallet reservation. Never replace it with a direct, unguarded execute command.
+Choose this mode when the user wants to operate entirely in their Agent conversation. The Skill can read HTTP without this runtime. Signing/execution uses the standalone runtime's preview, confirmation and durable wallet reservation. Never replace it with a direct, unguarded execute command.
 
 1. Obtain the trusted deployment origin from the user. Request `/agent-distribution/manifest.json` there. If it is unavailable, stop rather than inventing a package or URL. Localhost works only on the machine serving Jump; it is not a production service.
 2. The manifest supplies version, Node requirement, relative runtime/skill paths and SHA-256. Resolve artifact paths only against that same trusted origin. Reject another origin, credentials, redirects or unexpected paths. A checksum from that same origin detects corruption, not an independently compromised publisher. Ask the user to approve installing software before downloading/extracting it into their selected runtime directory.
@@ -131,7 +144,7 @@ Unapproved client registrations expire after 10 minutes. After a first successfu
 
 ### Creator access
 
-The remote wallet endpoint can expose six creator tools when the deployment enables `creator_tools` and the owner grants `jump:launch`: `jump_create_launch_draft`, `jump_creator_launches`, `jump_update_launch_metadata`, `jump_cancel_launch_draft`, `jump_request_launch`, `jump_request_creator_fees`. Reauthorize existing clients to consent to the new scope. Creating a draft does not create a chain transaction. Launch and creator-fee requests return a browser confirmation link; the owner confirms each exact preview personally. Platform creation fee is zero; network Gas remains. Local CLI/stdio creator commands are not provided.
+The remote wallet endpoint can expose six creator tools when the deployment enables `creator_tools` and the owner grants `jump:launch`: `jump_create_launch_draft`, `jump_creator_launches`, `jump_update_launch_metadata`, `jump_cancel_launch_draft`, `jump_request_launch`, `jump_request_creator_fees`. Reauthorize existing clients to consent to the new scope. Creating a draft does not create a chain transaction. Launch and creator-fee requests return a browser confirmation link; the owner confirms each exact preview personally. Platform creation fee is zero; network Gas remains. Local stdio MCP v0.4.0+ instead exposes the four draft-management tools plus `jump_action_preview` for creation, creator fees and auction actions. It authenticates with the locally signed Agent login and executes after confirmation in chat; no remote OAuth or Jump confirmation page is needed. Wallet-required Binance App approval remains. The CLI equivalent is `action-preview --token-id ID --action create-launch --draft-revision REVISION`, followed by the existing exact-digest `execute` command.
 
 
 # Public HTTP API
@@ -149,7 +162,17 @@ Use the user-selected trusted HTTPS origin as the base. Interpret `{code,data,ms
 
 Preparation actions: `deposit`, `withdraw`, `claim`, `cancelled-refund`, `deferred-refund`. Only deposit/withdraw take amount; claim needs an available canonical allocation proof. Check the deployment capability flag before requesting a plan. A plan's digest does not approve anything. Use the installed runtime to create its own fresh provider preview and durable execution guard; do not directly broadcast an old HTTP plan or bypass the runtime's unresolved submission lock.
 
-Website `/api/agent-wallet/*` is a separate browser-cookie session with Origin checks. Do not reuse its cookies or treat it as a public remote signer. Launch creation, staking, secondary trading, .ai resolution and automatic scheduling are outside this first integration.
+Website `/api/agent-wallet/*` is a separate browser-cookie session with Origin checks. Do not reuse its cookies or treat it as a public remote signer. Local creator tools are described below. Staking, secondary trading and automatic scheduling are not offered by this runtime; `.ai` lookup is read-only.
+
+## Local execution APIs (runtime v0.4.0+)
+
+These endpoints require the existing wallet-signed, audience/chain-scoped Agent JWT, never a browser cookie or remote OAuth token. Check `local_mcp.enabled` before use.
+
+- `POST /api/agent/v1/local/plans`: named intent (`chain_id`, database `token_id`, `action`, and applicable `amount`, `payment_asset`, `draft_revision`, `fee_asset`). Supports auction actions plus enabled `create-launch` / `claim-creator-fees`. Arbitrary destinations, calldata, recipients and frozen authorization fields are rejected. Returns an expiring server-stored plan ID and unsigned wallet call, never broadcasts.
+- `POST /api/agent/v1/local/plans/{plan_id}/reserve`: exact `call` and wallet `provider_request_id`. Revalidates the original frozen intent, nonce, deployment fingerprint, expiry and owner before acquiring the shared wallet guard. Use the existing `/reservations/{id}/dispatch` and `/result` protocol; no provider call is allowed before dispatch acknowledgment.
+- `/api/agent/v1/local/creator/drafts`: GET owned records or POST an idempotent creation draft. GET `/{token_id}`, POST `/{token_id}/metadata` and `/{token_id}/cancel` reuse the creator revision/ownership rules. This cannot cancel a live on-chain auction or acquire protocol operator privileges.
+
+The local runtime presents the wallet preview in chat and submits only its confirmed digest. Server preparation is not spending permission. Initial wallet pairing and any required App approval are separate.
 
 
 ## Official deployment status

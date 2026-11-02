@@ -45,6 +45,16 @@ program.command('preview').requiredOption('--token-id <id>', 'Database token ID'
   .addOption(new Option('--action <action>', 'Auction action').choices(['deposit', 'claim', 'withdraw', 'cancelled-refund', 'deferred-refund']).makeOptionMandatory())
   .option('--amount <decimal>', 'Required for deposit or withdrawal, in the auction asset')
   .action(async o => output(await runner().preview(Number(o.tokenId), o.action, o.amount)));
+program.command('action-preview').description('Preview a named business operation for confirmation in chat, without a website')
+  .requiredOption('--token-id <id>', 'Database token or draft ID')
+  .addOption(new Option('--action <action>', 'Business action').choices(['create-launch', 'claim-creator-fees', 'deposit', 'withdraw', 'claim', 'cancelled-refund', 'deferred-refund']).makeOptionMandatory())
+  .option('--amount <decimal>', 'Deposit payment amount or withdrawal auction amount')
+  .option('--payment-asset <address>', 'Configured payment token for deposit; zero address for native')
+  .option('--draft-revision <number>', 'Reviewed creator draft revision for creation')
+  .option('--fee-asset <address>', 'Creator fee asset; zero address for native')
+  .action(async o => output(await runner().actionPreview({ token_id: Number(o.tokenId), action: o.action,
+    ...(o.amount !== undefined ? { amount: o.amount } : {}), ...(o.paymentAsset ? { payment_asset: o.paymentAsset } : {}),
+    ...(o.draftRevision ? { draft_revision: Number(o.draftRevision) } : {}), ...(o.feeAsset ? { fee_asset: o.feeAsset } : {}) })));
 program.command('login-preview').description('Preview a Jump EIP-712 login signature, without approving it').action(async () => output(await runner().loginPreview()));
 program.command('execute').requiredOption('--preview-id <id>', 'Local preview ID')
   .requiredOption('--confirm-digest <sha256>', 'Digest of the exact preview the user explicitly confirmed')

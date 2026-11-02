@@ -411,3 +411,89 @@ test('production login audience is pinned to the configured origin unless explic
   assert.equal(expectedAudience('https://example.com', 'configured-audience'), 'configured-audience');
   assert.throws(() => expectedAudience('http://remote.example'));
 });
+
+async function businessFixture() {
+  const f = await fixture();
+  const planId = randomUUID();
+  const requests: any[] = [];
+  (f.runner as any).deployment = async () => ({ fingerprint: f.context.fingerprint, engine, factory });
+  (f.runner.wallet as any).call = async (args: string[]) => {
+    f.calls.push(args);
+    return args[1] === 'preview'
+      ? { requestId: 'business-request', expiresAt: Date.now() + 60_000, simulationResult: { simulationCode: '000000000' }, risks: { riskDetails: [] } }
+      : { status: 'BROADCASTED', txHash: `0x${'ab'.repeat(32)}`, orderId: 'original' };
+  };
+  let rejectReservation = false;
+  f.runner.api.request = async (path, options) => {
+    requests.push({ path, ...options });
+    if (path === '/agent/v1/local/plans') return { plan_id: planId, chain_id: 56, wallet: walletAddress,
+      expires_at: Date.now() + 60_000, submitted: false, confirmation_required: true,
+      transaction: { call: { from: walletAddress, to: factory, value: '0', data: '0x1234' }, method: 'createLaunch', detail: { platform_creation_fee: '0', draft_revision: 3 } } };
+    if (path.endsWith('/reserve')) {
+      if (rejectReservation) throw new Error('Prepared plan changed');
+      return { operation_id: planId };
+    }
+    if (path.endsWith('/dispatch')) return { operation_id: planId, state: 'SUBMISSION_UNKNOWN', guard_active: true };
+    if (path.endsWith('/result')) return { operation_id: planId, chain_id: 56, wallet: walletAddress, state: 'SUBMITTED', guard_active: true };
+    throw new Error('Unexpected request');
+  };
+  return { ...f, planId, requests, rejectReservation: () => { rejectReservation = true; } };
+}
+
+test('local creator preview executes the frozen server plan once without a browser handoff', async () => {
+  const f = await businessFixture();
+  try {
+    const preview = await f.runner.actionPreview({ token_id: 1, action: 'create-launch', draft_revision: 3 });
+    assert.equal(preview.preparedPlanId, f.planId);
+    assert.equal(preview.detail.platform_creation_fee, '0');
+    assert.equal(f.calls.filter(c => c[1] === 'execute').length, 0);
+    await assert.rejects(() => f.runner.execute(preview.previewId, '0'.repeat(64)));
+    await f.runner.execute(preview.previewId, preview.confirmDigest);
+    assert.equal(f.calls.filter(c => c[1] === 'execute').length, 1);
+    const reserve = f.requests.find(r => r.path.endsWith('/reserve'));
+    assert.deepEqual(Object.keys(reserve.body).sort(), ['call', 'provider_request_id']);
+    assert.equal(f.requests.some(r => r.path.includes('/api/mcp/requests')), false);
+    await assert.rejects(() => f.runner.execute(preview.previewId, preview.confirmDigest));
+  } finally { await f.cleanup(); }
+});
+
+test('server revalidation failure prevents any wallet dispatch and completes the unsigned local guard', async () => {
+  const f = await businessFixture();
+  try {
+    const preview = await f.runner.actionPreview({ token_id: 1, action: 'create-launch', draft_revision: 3 });
+    f.rejectReservation();
+    await assert.rejects(() => f.runner.execute(preview.previewId, preview.confirmDigest));
+    assert.equal(f.calls.filter(c => c[1] === 'execute').length, 0);
+    assert.equal(await f.store.optional(submissionKey(56, walletAddress)), undefined);
+    assert.equal((await f.store.get(preview.previewId)).state, 'NOT_SUBMITTED');
+  } finally { await f.cleanup(); }
+});
+
+test('local business preview requires successful wallet simulation and forwards exact payment intent', async () => {
+  const f = await businessFixture();
+  try {
+    (f.runner.wallet as any).call = async () => ({ requestId: 'bad', expiresAt: Date.now() + 60_000,
+      simulationResult: { simulationCode: 'FAILED' } });
+    await assert.rejects(() => f.runner.actionPreview({ token_id: 1, action: 'deposit', amount: '0.05', payment_asset: engine }), /simulation did not pass/);
+    assert.equal(f.requests[0].body.payment_asset, engine);
+    assert.equal(f.requests[0].body.amount, '0.05');
+    assert.equal((await f.runner.journal()).length, 0);
+  } finally { await f.cleanup(); }
+});
+
+test('confirmed local creation retains public launch identity across restart without another provider request', async () => {
+  const f = await businessFixture();
+  try {
+    const preview = await f.runner.actionPreview({ token_id: 1, action: 'create-launch', draft_revision: 3 });
+    const record = await f.store.get(preview.previewId);
+    record.state = 'CONFIRMED';
+    record.createdLaunch = { token_id: 1, launch_id: 9, token_address: engine, forbidden: 'not-public' };
+    await f.store.put(preview.previewId, record);
+    const requestsBefore = f.requests.length;
+    const result = await f.runner.result(preview.previewId);
+    assert.ok('createdLaunch' in result);
+    assert.deepEqual(result.createdLaunch, { token_id: 1, launch_id: 9, token_address: engine });
+    assert.equal(f.requests.length, requestsBefore);
+    assert.equal(f.calls.filter(c => c[1] === 'execute').length, 0);
+  } finally { await f.cleanup(); }
+});
