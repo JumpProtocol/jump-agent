@@ -7,7 +7,7 @@ import { Store, sessionKey } from './store';
 import type { Options } from './runner';
 import { publicError } from './errors';
 
-const program = new Command().name('jump').description('Jump Agent tools. JSON output; every signature requires a separate preview and explicit confirmation.').version('0.1.0');
+const program = new Command().name('jump').description('Jump Agent tools. JSON output; every signature requires a separate preview and explicit confirmation.').version('0.2.0');
 program.exitOverride().configureOutput({ writeErr: () => {} });
 program
   .addOption(new Option('--api <origin>', 'Jump API origin; HTTPS or localhost').env('JUMP_API_URL').makeOptionMandatory())

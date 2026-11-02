@@ -1,0 +1,12 @@
+import { backendApi, remoteGateway } from './remote';
+const publicOrigin = process.env.JUMP_MCP_PUBLIC_ORIGIN;
+const internalApi = process.env.JUMP_MCP_INTERNAL_API;
+const port = Number(process.env.PORT ?? 8090);
+if (!publicOrigin || !internalApi || !Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Explicit MCP deployment configuration required');
+const server = remoteGateway(backendApi(internalApi), publicOrigin);
+server.requestTimeout = 25_000;
+server.headersTimeout = 10_000;
+server.keepAliveTimeout = 5_000;
+server.maxConnections = 256;
+server.listen(port, '0.0.0.0');
+for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, () => { server.close(); setTimeout(() => process.exit(0), 5000).unref(); });

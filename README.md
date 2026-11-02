@@ -1,16 +1,22 @@
 # Jump Agent · Preview
 
-Official Skill and local MCP distribution channel for [Jump](https://app.jump.family/).
+Official Skill, remote MCP and optional local runtime distribution channel for [Jump](https://app.jump.family/).
 
-This repository is a public integration preview. The BSC mainnet preview at https://app.jump.family now exposes Agent v1 preparation and hosted wallet pairing/execution; check its capabilities before use. Hosted mainnet signed login and a native BNB deposit/full withdrawal have been verified. Local-runtime wallet execution, ERC20 approval and positive claim/cancelled/deferred-refund paths still require separate live acceptance. Never treat a successful local test, downloaded Skill, or connected QR as permission to spend.
+This repository is a public integration preview. The BSC mainnet preview at https://app.jump.family now exposes Agent v1 preparation and hosted wallet pairing/execution; check its capabilities before use. Hosted mainnet signed login and a native BNB deposit/full withdrawal have been verified. Hosted USDT exact approval, conversion into a BNB auction and full withdrawal are verified. Local-runtime wallet execution, USDT-denominated launches and positive claim/cancelled/deferred-refund paths still require separate live acceptance. Never treat a successful local test, downloaded Skill, or connected QR as permission to spend.
 
 ## Install the Skill
 
 Download `SKILL.md` from this repository and install it using your agent client's documented local Skill installation. The Skill is self-contained. No Jump source checkout is required for HTTP reads. If using a Skill installer, verify the repository is `JumpProtocol/jump-agent` and inspect the contents before installing.
 
+## Remote MCP
+
+Check `/api/agent/v1/capabilities` on the trusted deployment. When enabled, configure `https://app.jump.family/mcp` for public reads, or `/mcp/wallet` for OAuth-scoped action requests. No Jump runtime or local Binance tool is required. Wallet requests open a separate Jump confirmation page; the owner reviews and submits every exact preview. Remote tools cannot sign or broadcast. Grants expire in 30 minutes, are revocable at `/agent/access`, and have no refresh tokens. Request expiry never clears an unresolved wallet guard.
+
+See [client installation](references/installation.md) for Codex, Claude Code and current OpenClaw commands, the optional connection checker, removal and upgrades. Older OpenClaw clients may need an update. Availability follows deployment capabilities, not release metadata.
+
 ## Local MCP
 
-The MCP runtime runs locally with Node.js 22 or later and uses the separately installed official Binance `baw` CLI. The tagged v0.1.1 preview archive is served by the website release manifest, with immutable hash paths and checksums. There is no published npm package or hosted MCP endpoint. Do not use an invented npm name, remote MCP URL, or repository-relative `agent/dist/cli.js` path.
+The MCP runtime runs locally with Node.js 22 or later and uses the separately installed official Binance `baw` CLI. The tagged v0.2.0 preview archive is served by the website release manifest, with immutable hash paths and checksums. There is no published npm package . Remote MCP is separately announced by deployment capabilities. Do not use an invented npm name, unverified endpoint, or repository-relative `agent/dist/cli.js` path.
 
 ## Safety
 
@@ -26,6 +32,8 @@ The MCP runtime runs locally with Node.js 22 or later and uses the separately in
 ## Release status
 
 A tagged preview candidate is available through https://app.jump.family/agent-distribution/manifest.json. It is not an npm package or a claim of live-wallet acceptance. Local development artifacts remain unsuitable for production. Future releases must include immutable archives, SHA-256 checksums, installation checks and build provenance. Source platform changes and production deployment are reviewed separately; this repository contains no deployment secrets or operator credentials.
+
+Unapproved client registrations expire after 10 minutes. After a first successful signed consent and token exchange, registered OAuth clients expire after 90 days without an authorization attempt. Active use extends registration; a dormant expired client must be removed and added again through its official client configuration. This is separate from the 30-minute wallet grant. Registration storage is capacity-limited and fails closed when full.
 
 ## Build and review the runtime source
 

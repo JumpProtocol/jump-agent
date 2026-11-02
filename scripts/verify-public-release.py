@@ -18,7 +18,7 @@ args = parser.parse_args()
 public = args.public_root.resolve() if args.public_root else root / 'release'
 manifest = json.loads((public / 'agent-distribution/manifest.json').read_text())
 expected = {'package/package.json', 'package/npm-shrinkwrap.json', 'package/dist/cli.js', 'package/dist/sdk.js'}
-for kind in ('runtime', 'skill'):
+for kind in ('runtime', 'skill', *(['connector'] if manifest.get('connector') else [])):
     artifact = manifest[kind]
     path = public / artifact['path'].removeprefix('/')
     if hashlib.sha256(path.read_bytes()).hexdigest() != artifact['sha256']:

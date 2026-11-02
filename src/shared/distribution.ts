@@ -1,5 +1,5 @@
 export interface Artifact { path: string; sha256: string; bytes: number }
-export interface Distribution { schema_version: number; version: string; node: string; skill: Artifact; runtime: Artifact; remote_mcp: null; release_state?: 'development' | 'candidate' }
+export interface Distribution { schema_version: number; version: string; node: string; skill: Artifact; runtime: Artifact; connector?: Artifact; remote_mcp: null; release_state?: 'development' | 'candidate' }
 
 export function validateDistribution(value: unknown): Distribution {
   const v = value as Distribution;
@@ -10,6 +10,8 @@ export function validateDistribution(value: unknown): Distribution {
     if (!artifact || !/^[a-f0-9]{64}$/.test(artifact.sha256) || !Number.isSafeInteger(artifact.bytes) || artifact.bytes <= 0 || artifact.bytes > 2_000_000 ||
       artifact.path !== `/agent-distribution/v${v.version}/jump-${prefix}-${artifact.sha256}.${suffix}`) throw new Error('Invalid release artifact');
   }
+  if (v.connector && (!/^[a-f0-9]{64}$/.test(v.connector.sha256) || !Number.isSafeInteger(v.connector.bytes) || v.connector.bytes <= 0 || v.connector.bytes > 100000 ||
+      v.connector.path !== `/agent-distribution/v${v.version}/jump-connect-${v.connector.sha256}.mjs`)) throw new Error('Invalid connection helper');
   return v;
 }
 
