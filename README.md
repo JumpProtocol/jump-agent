@@ -16,7 +16,7 @@ See [client installation](references/installation.md) for Codex, Claude Code and
 
 ## Local MCP
 
-The MCP runtime runs locally with Node.js 22 or later and uses the separately installed official Binance `baw` CLI. The tagged v0.3.0 preview archive is served by the website release manifest, with immutable hash paths and checksums. There is no published npm package . Remote MCP is separately announced by deployment capabilities. Do not use an invented npm name, unverified endpoint, or repository-relative `agent/dist/cli.js` path.
+The MCP runtime runs locally with Node.js 22 or later and uses the separately installed official Binance `baw` CLI. The tagged v0.3.1 preview archive is served by the website release manifest, with immutable hash paths and checksums. There is no published npm package . Remote MCP is separately announced by deployment capabilities. Do not use an invented npm name, unverified endpoint, or repository-relative `agent/dist/cli.js` path.
 
 ## Safety
 

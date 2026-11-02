@@ -47,6 +47,9 @@ with tempfile.TemporaryDirectory(prefix='jump-agent-install-') as temp:
     result = subprocess.run(['node', 'dist/cli.js', '--help'], cwd=package, capture_output=True, text=True, timeout=20)
     if result.returncode or 'Jump Agent tools' not in result.stdout:
         raise RuntimeError('Installed CLI did not start')
+    version = subprocess.run(['node', 'dist/cli.js', '--version'], cwd=package, capture_output=True, text=True, timeout=20)
+    if version.returncode or version.stdout.strip() != manifest['version']:
+        raise RuntimeError('Installed CLI version differs from the release manifest')
     child = subprocess.Popen(['node', 'dist/cli.js', '--api', 'http://127.0.0.1:9', '--chain-id', '97', 'mcp'],
         cwd=package, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     # initialise is protocol-only and must not require a wallet or live API.

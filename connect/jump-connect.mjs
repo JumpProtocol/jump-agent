@@ -39,7 +39,7 @@ export async function doctor(origin) {
   if (!response.ok || result.code !== 0 || !result.data.remote_mcp || result.data.remote_mcp.public_url !== u.origin + '/mcp' || result.data.remote_mcp.wallet_url !== u.origin + '/mcp/wallet') throw new Error('Remote MCP is not enabled for this exact origin');
   const handshake = await fetch(new URL('/mcp', u), { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(10000),
     headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'jump-connect-doctor', version: '0.3.0' } } }) });
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'jump-connect-doctor', version: '0.3.1' } } }) });
   const text = await boundedText(handshake);
   const initialized = handshake.headers.get('content-type')?.includes('text/event-stream')
     ? text.split(/\r?\n/).filter(line => line.startsWith('data:')).map(line => JSON.parse(line.slice(5).trim())).find(value => value.id === 1)

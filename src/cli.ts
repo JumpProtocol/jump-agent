@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command, Option } from 'commander';
+import { readFileSync } from 'node:fs';
 import { createPublicClient, http, getAddress } from 'viem';
 import { Runner, expectedAudience, chainId, json } from './runner';
 import { safeUrl } from './api';
@@ -7,7 +8,7 @@ import { Store, sessionKey } from './store';
 import type { Options } from './runner';
 import { publicError } from './errors';
 
-const program = new Command().name('jump').description('Jump Agent tools. JSON output; every signature requires a separate preview and explicit confirmation.').version('0.2.0');
+const program = new Command().name('jump').description('Jump Agent tools. JSON output; every signature requires a separate preview and explicit confirmation.').version(JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
 program.exitOverride().configureOutput({ writeErr: () => {} });
 program
   .addOption(new Option('--api <origin>', 'Jump API origin; HTTPS or localhost').env('JUMP_API_URL').makeOptionMandatory())
