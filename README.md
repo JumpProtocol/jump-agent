@@ -16,7 +16,7 @@ See [client installation](references/installation.md) for Codex, Claude Code and
 
 ## Local MCP
 
-The MCP runtime runs locally with Node.js 22 or later and uses the separately installed official Binance `baw` CLI. The tagged v0.4.2 preview archive is served by the website release manifest, with immutable hash paths and checksums. There is no published npm package. Remote MCP is separately announced by deployment capabilities. Do not use an invented npm name, unverified endpoint, or repository-relative `agent/dist/cli.js` path.
+The MCP runtime runs locally with Node.js 22 or later and uses the separately installed official Binance `baw` CLI. The tagged v0.4.3 preview archive is served by the website release manifest, with immutable hash paths and checksums. There is no published npm package. Remote MCP is separately announced by deployment capabilities. Do not use an invented npm name, unverified endpoint, or repository-relative `agent/dist/cli.js` path.
 
 ## Safety
 
@@ -46,6 +46,11 @@ With explicit `jump:launch` consent, the remote wallet connection also provides 
 Use the local stdio MCP plus official Binance baw when you want the Agent to execute without opening Jump. After one-time installation, wallet pairing and signed Jump login, ask it to prepare a launch, contribute, withdraw, or collect eligible allocations/refunds/creator fees. Review the concrete preview in chat and confirm; the Agent executes and tracks the original receipt. A broad goal does not grant unattended spending. Remote HTTP MCP remains a separate browser-handoff option.
 
 Local business tools: `jump_create_launch_draft`, `jump_creator_launches`, `jump_update_launch_metadata`, `jump_cancel_launch_draft`, `jump_action_preview`. Creator and converted-payment previews persist a server-owned frozen plan before the local wallet preview. Execution revalidates that plan and takes the shared wallet/chain guard before dispatch. Expired/changed plans fail closed. An unknown broadcast is never replaced automatically. Creation still has zero platform fee and requires network gas.
+
+
+## Guided setup and upgrades
+
+Use the optional installer download in the website release manifest. Verify its SHA-256, inspect it, save as jump-setup.mjs, then run `node jump-setup.mjs --origin https://app.jump.family --rpc https://YOUR-PUBLIC-RPC/` to inspect a plan. Add --apply to install. The helper discovers chain/contract configuration, verifies release hashes and installed deployment, and prints local MCP configuration. Import that configuration and the matching Skill in your client. Re-run to check/upgrade; restart MCP and update the Skill. Old versions and wallet journals are retained; pending transactions block upgrades. Installation does not pair a wallet or sign transactions. See references/installation.md for details.
 
 ## Build and review the runtime source
 

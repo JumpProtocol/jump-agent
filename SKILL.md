@@ -158,6 +158,21 @@ Unapproved client registrations expire after 10 minutes. After a first successfu
 The remote wallet endpoint can expose six creator tools when the deployment enables `creator_tools` and the owner grants `jump:launch`: `jump_create_launch_draft`, `jump_creator_launches`, `jump_update_launch_metadata`, `jump_cancel_launch_draft`, `jump_request_launch`, `jump_request_creator_fees`. Reauthorize existing clients to consent to the new scope. Creating a draft does not create a chain transaction. Launch and creator-fee requests return a browser confirmation link; the owner confirms each exact preview personally. Platform creation fee is zero; network Gas remains. Local stdio MCP v0.4.0+ instead exposes the four draft-management tools plus `jump_action_preview` for creation, creator fees and auction actions. It authenticates with the locally signed Agent login and executes after confirmation in chat; no remote OAuth or Jump confirmation page is needed. Wallet-required Binance App approval remains. The CLI equivalent is `action-preview --token-id ID --action create-launch --draft-revision REVISION`, followed by the existing exact-digest `execute` command.
 
 
+## Guided installer and safe upgrades (v0.4.3+)
+
+The website manifest's optional installer artifact is a standalone Node.js helper, jump-setup.mjs. Download from the trusted same-origin content-hash path, inspect it and verify SHA-256 before running. The helper never pairs or signs a wallet.
+
+Run `node jump-setup.mjs --origin https://app.jump.family --rpc https://YOUR-PUBLIC-RPC/` to discover chain, audience and contract pins and show the current/latest version. Add `--apply` to install after reviewing the plan. Supply a credential-free public HTTPS RPC origin. No contract addresses need manual copying. First installation needs Node.js 22+, npm and access to registry.npmjs.org.
+
+Optional `--directory /ABSOLUTE/INSTALL` selects a private installation root (default ~/.jump-install). `--state-dir /EXISTING/STATE` selects the user's existing private operation-state directory (default JUMP_AGENT_DIR or ~/.jump-agent). Keep these directories separate. The installer does not migrate, delete or reset any wallet journal, token, pending or claimed record. Pending submissions block upgrades. Never point it at a second empty state directory to bypass a guard.
+
+The helper validates clean release metadata, exact bounded archive entries, dependency sources and checksums; installs side-by-side with lifecycle scripts disabled; then runs the runtime's chain/deployment doctor before atomically switching current.json. A failed validation leaves the previous active installation in place. Old version directories and previous.json are retained. Changed deployment/state configuration, downgrades and changed same-version runtime hashes stop automatic upgrades.
+
+Use the printed Node command and stable jump.mjs path in the Agent client's local MCP configuration. A ready-to-import mcp-config.json is also written under the installation root; do not overwrite the client's existing configuration blindly. Import the downloaded jump-skill.zip through the client's Skill interface. This helper does not modify global Codex/Claude/OpenClaw settings. Client-specific import is a one-time step.
+
+Re-run without --apply to check versions; with --apply to update the runtime and download the matching Skill. Restart local MCP and import the updated Skill afterwards. Public remote MCP updates remain server-side; new scopes may require consent. Wallet/App pairing, login and transaction confirmation are separate from installation. Same-origin checksums do not independently authenticate a compromised publisher.
+
+
 # Public HTTP API
 
 Use the user-selected trusted HTTPS origin as the base. Interpret `{code,data,msg}`: only `code=0` is success, including when HTTP status is 200. Requests must have bounded timeout/size and must not forward credentials on redirects.

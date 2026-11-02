@@ -8,6 +8,8 @@ test('release downloads are same-origin content-hashed artifacts, not arbitrary 
     runtime: { sha256: hash, bytes: 123, path: `/agent-distribution/v0.1.0/jump-agent-${hash}.tgz` },
     skill: { sha256: hash, bytes: 234, path: `/agent-distribution/v0.1.0/jump-skill-${hash}.zip` } };
   assert.equal(validateDistribution(valid).version, '0.1.0');
+  assert.equal(validateDistribution({ ...valid, installer: { sha256: hash, bytes: 123, path: `/agent-distribution/v0.1.0/jump-setup-${hash}.mjs` } }).installer?.bytes, 123);
+  assert.throws(() => validateDistribution({ ...valid, installer: { sha256: hash, bytes: 123, path: 'https://evil.example/setup.mjs' } }));
   for (const path of ['https://other.example/install.sh', '//other.example/a.tgz', '/agent-distribution/../private', valid.runtime.path+'?redirect=1']) {
     assert.throws(() => validateDistribution({ ...valid, runtime: { ...valid.runtime, path } }));
   }
