@@ -48,8 +48,13 @@ test('setup installs side-by-side, verifies before switching and preserves all o
   const evidence=Buffer.from('pending transaction evidence and private session stay unchanged');
   await writeFile(join(state,'journal.json'),evidence,{mode:0o600});
   let origin='',ver='1.0.0',pass=true;
-  const server=createServer((req,res)=>{
+  let race = false;
+  const server=createServer(async (req,res)=>{
     const runtime=archive(ver,pass),skill=Buffer.from('test skill download');
+    if (race && req.url==='/agent-distribution/manifest.json') {
+      const active=JSON.parse(await readFile(join(root,'current.json'),'utf8'));
+      await writeFile(join(root,'current.json'),JSON.stringify({...active,version:'9.9.9'}),{mode:0o600});
+    }
     const item=(kind: string,b: Buffer,suffix: string)=>({path:'/agent-distribution/v'+ver+'/jump-'+kind+'-'+sha(b)+'.'+suffix,sha256:sha(b),bytes:b.length});
     if(req.url==='/agent-distribution/manifest.json') res.end(JSON.stringify({schema_version:1,version:ver,node:'>=22',release_state:'candidate',working_tree_dirty:false,runtime:item('agent',runtime,'tgz'),skill:item('skill',skill,'zip')}));
     else if(req.url==='/api/agent/v1/capabilities') res.end(JSON.stringify({code:0,data:{execution_chain_id:97,local_mcp:{enabled:true},authentication_audience:origin}}));
@@ -69,7 +74,10 @@ test('setup installs side-by-side, verifies before switching and preserves all o
     assert.equal(first.status,'INSTALLED_AND_VERIFIED');
     assert.deepEqual(first.mcp.args,[join(root,'jump.mjs'),'mcp']);
     const current=await readFile(join(root,'current.json'));
-    ver='1.0.1';pass=false;
+    ver='1.0.1';race=true;
+    await assert.rejects(()=>setup({...options,apply:true}),/Installation changed/);
+    race=false;await writeFile(join(root,'current.json'),current,{mode:0o600});
+    pass=false;
     await assert.rejects(()=>setup({...options,apply:true}),/checks failed/);
     assert.deepEqual(await readFile(join(root,'current.json')),current);
     pass=true;

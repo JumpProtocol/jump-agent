@@ -151,6 +151,9 @@ export async function setup(options) {
   await privateDirectory(root);
   const lock=await open(join(root,'install.lock'),constants.O_CREAT|constants.O_EXCL|constants.O_WRONLY|constants.O_NOFOLLOW,0o600);
   try {
+    const latest = await privateJson(join(root,'current.json'),true);
+    if (JSON.stringify(latest)!==JSON.stringify(current)) throw new Error('Installation changed during discovery; inspect a fresh plan');
+    await assertNoPending(stateDir);
     // Never overwrite old versions or touch wallet journals, sessions, guards or Binance files.
     const bytes=await bounded(origin+m.runtime.path,2000000);
     if(bytes.length!==m.runtime.bytes || sha(bytes)!==m.runtime.sha256) throw new Error('Runtime checksum mismatch');
@@ -180,6 +183,7 @@ export async function setup(options) {
     const launcher=`import {readFileSync} from 'node:fs';import {spawn} from 'node:child_process';import {fileURLToPath} from 'node:url';import {dirname,join} from 'node:path';const c=JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)),'current.json'),'utf8'));const p=spawn(process.execPath,[join(c.directory,'dist/cli.js'),...process.argv.slice(2)],{stdio:'inherit',env:{...process.env,...c.config}});p.on('error',()=>{process.exitCode=1});p.on('exit',code=>{process.exitCode=code??1});\n`;
     const launcherPath=join(root,'jump.mjs');
     try { const s = await lstat(launcherPath); if (!s.isFile() || s.isSymbolicLink() || s.mode & 0o077) throw new Error('Unsafe launcher'); } catch(e) { if(e.code!=='ENOENT') throw e; await writeFile(launcherPath,launcher,{flag:'wx',mode:0o600}); }
+    await assertNoPending(stateDir);
     await atomicJson(join(root,'mcp-config.json'),{mcpServers:{'jump-local':{command:process.execPath,args:[launcherPath,'mcp']}}});
     if(current) await atomicJson(join(root,'previous.json'),current);
     await atomicJson(join(root,'current.json'),record);
