@@ -7,6 +7,7 @@ import gzip
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import tarfile
@@ -74,7 +75,7 @@ def publish(kind, data, suffix):
 manifest = {'schema_version': 1, 'version': source['version'], 'node': source['engines']['node'],
     'api_capabilities': '/api/agent/v1/capabilities', 'remote_mcp': None,
     'source_commit': commit, 'working_tree_dirty': dirty, 'release_state': 'candidate' if args.production else 'development',
-    'live_wallet_acceptance': 'pending', 'runtime': publish('agent', runtime, 'tgz'),
+    'live_wallet_acceptance': os.environ.get('JUMP_LIVE_WALLET_ACCEPTANCE', 'partial-mainnet'), 'runtime': publish('agent', runtime, 'tgz'),
     'skill': publish('skill', skill, 'zip'), 'connector': publish('connect', (agent / 'connect/jump-connect.mjs').read_bytes(), 'mjs'), 'runtime_files': sorted(files),
     'install': 'Extract into a new directory; in package run npm ci --omit=dev --ignore-scripts --no-audit --no-fund. No global install or administrator privileges.',
     'notes': 'Downloads do not grant wallet access. HTTP reads need no runtime. Execution requires official baw, verified configuration, an exact confirmed preview and durable receipt reconciliation.'}

@@ -21,7 +21,7 @@ test('signature recovery is normalized and inconsistent values fail', () => {
 });
 test('preview expiry rejects missing provider data and bounds validity', () => {
   const now = Date.now();
-  assert.equal(previewExpiry({ requestId: 'id', expiresAt: now + 500_000 }, now), now + 120_000);
+  assert.equal(previewExpiry({ requestId: 'id', expiresAt: now + 500_000 }, now), now + 240_000);
   assert.throws(() => previewExpiry({ requestId: 'id', expiresAt: now - 1 }, now));
   assert.throws(() => previewExpiry({ expiresAt: now + 1000 }, now));
 });

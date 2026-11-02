@@ -15,10 +15,14 @@ export class JumpApi {
     this.base = url.href.replace(/\/$/, '');
   }
 
-  async request(path: string, options: { body?: unknown; token?: string } = {}): Promise<any> {
+  async request(path: string, options: { body?: unknown; token?: string; timeoutMs?: number } = {}): Promise<any> {
+    const timeoutMs = options.timeoutMs ?? 15_000;
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1_000 || timeoutMs > 30_000) {
+      throw new Error('Jump API timeout must be between 1 and 30 seconds');
+    }
     const response = await fetch(`${this.base}/api${path}`, {
       method: options.body === undefined ? 'GET' : 'POST', redirect: 'error',
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(timeoutMs),
       headers: { 'Content-Type': 'application/json', ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}) },
       ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
     });

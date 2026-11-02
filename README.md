@@ -2,7 +2,7 @@
 
 Official Skill, remote MCP and optional local runtime distribution channel for [Jump](https://app.jump.family/).
 
-This repository is a public integration preview. The BSC mainnet preview at https://app.jump.family now exposes Agent v1 preparation and hosted wallet pairing/execution; check its capabilities before use. Hosted mainnet signed login and a native BNB deposit/full withdrawal have been verified. Hosted USDT exact approval, conversion into a BNB auction and full withdrawal are verified. Local-runtime wallet execution, USDT-denominated launches and positive claim/cancelled/deferred-refund paths still require separate live acceptance. Never treat a successful local test, downloaded Skill, or connected QR as permission to spend.
+This repository is a public integration preview. The BSC mainnet preview at https://app.jump.family now exposes Agent v1 preparation and hosted wallet pairing/execution; check its capabilities before use. Hosted and local-runtime mainnet creation, native deposits, exact USDT approval, USDT conversion into a BNB auction and withdrawal are verified. Positive claim, cancelled/deferred-refund and creator-fee paths still require suitable chain state and separate live acceptance. Never treat a successful local test, downloaded Skill, or connected QR as permission to spend.
 
 ## Install the Skill
 
@@ -16,7 +16,7 @@ See [client installation](references/installation.md) for Codex, Claude Code and
 
 ## Local MCP
 
-The MCP runtime runs locally with Node.js 22 or later and uses the separately installed official Binance `baw` CLI. The tagged v0.4.0 preview archive is served by the website release manifest, with immutable hash paths and checksums. There is no published npm package . Remote MCP is separately announced by deployment capabilities. Do not use an invented npm name, unverified endpoint, or repository-relative `agent/dist/cli.js` path.
+The MCP runtime runs locally with Node.js 22 or later and uses the separately installed official Binance `baw` CLI. The tagged v0.4.1 preview archive is served by the website release manifest, with immutable hash paths and checksums. There is no published npm package. Remote MCP is separately announced by deployment capabilities. Do not use an invented npm name, unverified endpoint, or repository-relative `agent/dist/cli.js` path.
 
 ## Safety
 

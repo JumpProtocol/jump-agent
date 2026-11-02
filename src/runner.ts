@@ -26,6 +26,15 @@ const IMPLEMENTATION_SLOT = '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a92
 export const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const json = (value: unknown) => JSON.parse(JSON.stringify(value, (_k, v) => typeof v === 'bigint' ? v.toString() : v));
 
+async function readRpc<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch {
+    await new Promise(resolve => setTimeout(resolve, 250));
+    return await read();
+  }
+}
+
 export function expectedAudience(api: string, override?: string): string {
   if (override) return override;
   const url = safeUrl(api);
@@ -42,7 +51,7 @@ export function previewExpiry(provider: any, now = Date.now()) {
   const n = Number(provider.expiresAt);
   const expiry = n < 1e12 ? n * 1000 : n;
   if (typeof provider.requestId !== 'string' || !provider.requestId || !Number.isFinite(expiry) || expiry <= now) throw new Error('Wallet preview is missing a valid request ID or expiry');
-  return Math.min(expiry, now + 120_000);
+  return Math.min(expiry, now + 240_000);
 }
 
 export function validateLoginChallenge(challenge: any, wallet: Address, chain: number, audience: string) {
@@ -83,7 +92,7 @@ export class Runner {
     if (!this.options.rpc) throw new Error('Set --rpc using verified chain configuration');
     const rpc = safeUrl(this.options.rpc);
     const client = createPublicClient({ transport: http(rpc.href, { timeout: 10_000, retryCount: 0 }) });
-    if (await client.getChainId() !== chainId(this.options)) throw new Error('RPC chain mismatch');
+    if (await readRpc(() => client.getChainId()) !== chainId(this.options)) throw new Error('RPC chain mismatch');
     return client;
   }
 
@@ -123,15 +132,16 @@ export class Runner {
     if (!Number.isSafeInteger(tokenId) || tokenId <= 0) throw new Error('Invalid token database ID');
     const client = await this.rpcClient();
     const [deployment, data, block] = await Promise.all([
-      this.deployment(client), this.api.request(`/tokens/${tokenId}?chain_id=${chainId(this.options)}`), client.getBlock(),
+      this.deployment(client), this.api.request(`/tokens/${tokenId}?chain_id=${chainId(this.options)}`),
+      readRpc(() => client.getBlock()),
     ]);
     const { engine, factory, fingerprint } = deployment;
     const token = tokenSchema.parse(data);
     if (token.id !== tokenId || token.chain_id !== chainId(this.options)) throw new Error('API token identity mismatch');
     const launchId = uint(token.launch_id);
     const [status, canonicalToken] = await Promise.all([
-      client.readContract({ address: engine, abi: AUCTION_ENGINE_ABI, functionName: 'getAuctionStatus', args: [launchId] }),
-      client.readContract({ address: factory, abi: LAUNCH_FACTORY_ABI, functionName: 'getTokenByLaunchId', args: [launchId] }),
+      readRpc(() => client.readContract({ address: engine, abi: AUCTION_ENGINE_ABI, functionName: 'getAuctionStatus', args: [launchId] })),
+      readRpc(() => client.readContract({ address: factory, abi: LAUNCH_FACTORY_ABI, functionName: 'getTokenByLaunchId', args: [launchId] })),
     ]);
     if (getAddress(canonicalToken) !== token.token_address || canonicalToken === zeroAddress) throw new Error('On-chain launch token differs from API');
     return { client, engine, factory, token, launchId, status, block, fingerprint };
@@ -139,10 +149,13 @@ export class Runner {
 
   private async fingerprint(client: ReturnType<typeof createPublicClient>, ...contracts: Address[]) {
     const entries = await Promise.all(contracts.map(async contract => {
-      const [code, slot] = await Promise.all([client.getCode({ address: contract }), client.getStorageAt({ address: contract, slot: IMPLEMENTATION_SLOT })]);
+      const [code, slot] = await Promise.all([
+        readRpc(() => client.getCode({ address: contract })),
+        readRpc(() => client.getStorageAt({ address: contract, slot: IMPLEMENTATION_SLOT })),
+      ]);
       if (!code || code === '0x' || !slot || slot.length !== 66) throw new Error('Cannot verify deployment');
       const implementation = getAddress(`0x${slot.slice(-40)}`);
-      const implementationCode = await client.getCode({ address: implementation });
+      const implementationCode = await readRpc(() => client.getCode({ address: implementation }));
       if (!implementationCode || implementationCode === '0x') throw new Error('Cannot verify proxy implementation');
       return { contract, code: keccak256(code), implementation, implementationCode: keccak256(implementationCode) };
     }));
@@ -234,7 +247,9 @@ export class Runner {
     if (parsed.wallet !== wallet || parsed.transaction.call.from !== wallet || parsed.expires_at <= Date.now()) throw new Error('Prepared plan identity or expiry mismatch');
     const call = { to: parsed.transaction.call.to, data: parsed.transaction.call.data as Hex, value: uint(parsed.transaction.call.value) };
     const [gas, gasPrice, balance] = await Promise.all([
-      client.estimateGas({ account: wallet, ...call }), client.getGasPrice(), client.getBalance({ address: wallet }),
+      readRpc(() => client.estimateGas({ account: wallet, ...call })),
+      readRpc(() => client.getGasPrice()),
+      readRpc(() => client.getBalance({ address: wallet })),
     ]);
     if (balance < call.value + gas * gasPrice) throw new Error('Insufficient BNB for value plus estimated gas');
     const provider = await this.wallet.call(['contract-call', 'preview', '--binanceChainId', String(chain),
@@ -287,7 +302,9 @@ export class Runner {
       const { c, call } = prepared;
       if (c.fingerprint !== plan.deploymentFingerprint || digest(json(call)) !== digest(plan.call)) throw new Error('Deployment or required transaction changed; preview again');
       const [gas, gasPrice, balance] = await Promise.all([
-        c.client.estimateGas({ account: wallet, ...call }), c.client.getGasPrice(), c.client.getBalance({ address: wallet }),
+        readRpc(() => c.client.estimateGas({ account: wallet, ...call })),
+        readRpc(() => c.client.getGasPrice()),
+        readRpc(() => c.client.getBalance({ address: wallet })),
       ]);
       if (balance < call.value + gas * gasPrice) throw new Error('Insufficient BNB for value plus current estimated gas');
     } else if (plan.kind === 'login') {
@@ -311,7 +328,7 @@ export class Runner {
       // Persist the reservation ID before requesting dispatch; an ambiguous ACK is never retried.
       const token = coordinationToken!;
       try {
-        const reservation = await this.api.request(plan.preparedPlanId ? `/agent/v1/local/plans/${plan.preparedPlanId}/reserve` : '/agent/v1/reservations', { token, body: plan.preparedPlanId ? { call: plan.call, provider_request_id: plan.provider.requestId } : {
+        const reservation = await this.api.request(plan.preparedPlanId ? `/agent/v1/local/plans/${plan.preparedPlanId}/reserve` : '/agent/v1/reservations', { token, timeoutMs: 30_000, body: plan.preparedPlanId ? { call: plan.call, provider_request_id: plan.provider.requestId } : {
           chain_id: plan.chainId, token_id: plan.tokenId, action: plan.action,
           ...(plan.amount !== undefined ? { amount: plan.amount } : {}),
           call: plan.call, provider_request_id: plan.provider.requestId,
@@ -328,7 +345,7 @@ export class Runner {
         await this.store.complete(submissionKey(plan.chainId, wallet), id, record);
         throw error;
       }
-      const dispatch = await this.api.request(`/agent/v1/reservations/${record.remoteOperationId}/dispatch`, { token, body: {} });
+      const dispatch = await this.api.request(`/agent/v1/reservations/${record.remoteOperationId}/dispatch`, { token, timeoutMs: 30_000, body: {} });
       if (dispatch.operation_id !== record.remoteOperationId || dispatch.state !== 'SUBMISSION_UNKNOWN' || dispatch.guard_active !== true) throw new Error('Shared dispatch not acknowledged; never execute or retry');
     }
     let result;
@@ -393,8 +410,8 @@ export class Runner {
     if (['MANUALLY_CLOSED', 'CONFIRMED', 'REVERTED'].includes(record.state)) return journalEntry(id, record);
     if (record.plan.kind === 'transaction' && record.remoteOperationId) {
       const shared = await this.reportRemote(record, false);
-      if (shared.state === 'MANUALLY_CLOSED' && shared.guard_active === false) {
-        record.state = 'MANUALLY_CLOSED';
+      if (['MANUALLY_CLOSED', 'EXPIRED'].includes(shared.state) && shared.guard_active === false && !shared.tx_hash) {
+        record.state = shared.state === 'EXPIRED' ? 'NOT_SUBMITTED' : 'MANUALLY_CLOSED';
         await this.store.complete(submissionKey(record.plan.chainId, record.plan.wallet), id, record);
         return journalEntry(id, record);
       }

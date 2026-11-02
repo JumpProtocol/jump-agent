@@ -91,6 +91,22 @@ test('balance or simulation changes after preview prevent wallet submission', as
   } finally { await f.cleanup(); }
 });
 
+test('transient RPC read failure is retried before creating a submission guard', async () => {
+  const f = await fixture();
+  try {
+    const p = await f.runner.preview(1, 'deposit', '0.1');
+    let attempts = 0;
+    f.context.client.estimateGas = async () => {
+      if (++attempts === 1) throw new Error('fetch failed');
+      return 21_000n;
+    };
+    const result = await f.runner.execute(p.previewId, p.confirmDigest);
+    assert.equal(result.status, 'BROADCASTED');
+    assert.equal(attempts, 2);
+    assert.equal(f.calls.filter(c => c[1] === 'execute').length, 1);
+  } finally { await f.cleanup(); }
+});
+
 test('preview expiring during validation never reaches wallet execute', async () => {
   const f = await fixture();
   const originalNow = Date.now;
@@ -137,6 +153,35 @@ test('unknown broadcast preserves a single-use guard across retries', async () =
     await assert.rejects(() => f.runner.reconcile(p.previewId), /has not returned a transaction hash/);
     const pending = await f.runner.pending(walletAddress);
     assert.equal('previewId' in pending && pending.previewId, p.previewId);
+  } finally { await f.cleanup(); }
+});
+
+test('expired undispatched shared reservation releases the local wallet guard', async () => {
+  const f = await fixture();
+  try {
+    const p = await f.runner.preview(1, 'deposit', '0.1');
+    const remoteId = randomUUID();
+    f.runner.api.request = async path => {
+      if (path === '/agent/v1/reservations') return { operation_id: remoteId };
+      if (path.endsWith('/dispatch')) throw new Error('dispatch unavailable');
+      throw new Error('Unexpected API request: ' + path);
+    };
+    await assert.rejects(() => f.runner.execute(p.previewId, p.confirmDigest), /dispatch unavailable/);
+    const record = await f.store.get(p.previewId);
+    assert.equal(record.state, 'submission-unknown');
+    assert.equal(record.remoteOperationId, remoteId);
+    f.runner.api.request = async () => ({
+      operation_id: record.remoteOperationId,
+      chain_id: 56,
+      wallet: walletAddress,
+      state: 'EXPIRED',
+      guard_active: false,
+      tx_hash: null,
+    });
+    const result = await f.runner.result(p.previewId);
+    assert.equal('state' in result && result.state, 'NOT_SUBMITTED');
+    assert.equal((await f.runner.pending(walletAddress)).state, 'NO_LOCAL_RESERVATION');
+    assert.ok((await f.runner.preview(1, 'deposit', '0.1')).previewId);
   } finally { await f.cleanup(); }
 });
 
@@ -452,6 +497,8 @@ test('local creator preview executes the frozen server plan once without a brows
     assert.equal(f.calls.filter(c => c[1] === 'execute').length, 1);
     const reserve = f.requests.find(r => r.path.endsWith('/reserve'));
     assert.deepEqual(Object.keys(reserve.body).sort(), ['call', 'provider_request_id']);
+    assert.equal(reserve.timeoutMs, 30_000);
+    assert.equal(f.requests.find(r => r.path.endsWith('/dispatch')).timeoutMs, 30_000);
     assert.equal(f.requests.some(r => r.path.includes('/api/mcp/requests')), false);
     await assert.rejects(() => f.runner.execute(preview.previewId, preview.confirmDigest));
   } finally { await f.cleanup(); }
