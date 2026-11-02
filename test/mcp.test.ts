@@ -19,7 +19,7 @@ test('MCP negotiates, exposes safe tools, validates input and reuses Runner', as
   await client.connect(b);
   try {
     const { tools } = await client.listTools();
-    assert.equal(tools.length, 20);
+    assert.equal(tools.length, 22);
     assert.equal(tools.find(t => t.name === 'jump_execute')?.annotations?.readOnlyHint, false);
     assert.equal(tools.find(t => t.name === 'jump_list')?.annotations?.readOnlyHint, true);
     const result = await client.callTool({ name: 'jump_list', arguments: { page: 2 } });
@@ -39,6 +39,11 @@ test('MCP negotiates, exposes safe tools, validates input and reuses Runner', as
     const arbitrary = await client.callTool({ name: 'jump_action_preview', arguments: { tokenId: 1, action: 'create-launch', draftRevision: 1, to: '0x' + '22'.repeat(20) } });
     assert.equal(arbitrary.isError, true);
     assert.equal(calls.length, 3);
+    await client.callTool({ name: 'jump_upload_launch_image', arguments: { contentBase64: 'aWNvbg==', contentType: 'image/png' } });
+    assert.deepEqual(calls[3], { path: '/images', body: { content_base64: 'aWNvbg==', content_type: 'image/png' } });
+    await client.callTool({ name: 'jump_update_launch_metadata', arguments: { tokenId: 1, expectedRevision: 2, imageUri: '/uploads/tokens/' + 'a'.repeat(32) + '.png' } });
+    assert.deepEqual(calls[4], { path: '/drafts/1/metadata', body: { expected_revision: 2, image_uri: '/uploads/tokens/' + 'a'.repeat(32) + '.png' } });
+
     const denied = await client.callTool({ name: 'jump_execute', arguments: { previewId: '00000000-0000-4000-8000-000000000001', confirmDigest: 'a'.repeat(64) } });
     assert.equal(denied.isError, true);
   } finally { await client.close(); await server.close(); }

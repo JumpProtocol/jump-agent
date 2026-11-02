@@ -88,7 +88,7 @@ test('creator tools require explicit launch scope and only prepare browser-confi
   try {
     await c.connect(new StreamableHTTPClientTransport(new URL(f.url+'/mcp/wallet'),{requestInit:{headers:{Authorization:'Bearer creator'}}}));
     const tools = (await c.listTools()).tools;
-    assert.equal(tools.length,13);
+    assert.equal(tools.length,14);
     assert.ok(!tools.some(t=>/execute|sign|broadcast/.test(t.name)));
     const result=await c.callTool({name:'jump_create_launch_draft',arguments:{clientRequestId:'00000000-0000-4000-8000-000000000002',name:'Creator',symbol:'CRT'}});
     assert.equal(result.isError,undefined);

@@ -24,3 +24,12 @@ These endpoints require the existing wallet-signed, audience/chain-scoped Agent 
 - `/api/agent/v1/local/creator/drafts`: GET owned records or POST an idempotent creation draft. GET `/{token_id}`, POST `/{token_id}/metadata` and `/{token_id}/cancel` reuse the creator revision/ownership rules. This cannot cancel a live on-chain auction or acquire protocol operator privileges.
 
 The local runtime presents the wallet preview in chat and submits only its confirmed digest. Server preparation is not spending permission. Initial wallet pairing and any required App approval are separate.
+
+
+## Creator images (runtime v0.4.2+)
+
+Authenticated local uploads: POST /api/agent/v1/local/creator/image-upload (multipart file, max 5 MiB).
+Small base64 icons: POST /api/agent/v1/local/creator/images or /api/mcp/creator/images (remote requires jump:launch), JSON content_base64 and content_type, max 16 KiB decoded.
+Return data.image_uri is accepted as imageUri by creation and revision-checked metadata tools.
+Image URLs are not fetched from arbitrary hosts. JPEG/PNG/GIF/WebP are decoded and checked server-side.
+Live image changes affect indexed display metadata only; on-chain image URI and economic terms remain unchanged.

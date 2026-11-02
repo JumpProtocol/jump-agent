@@ -544,3 +544,19 @@ test('confirmed local creation retains public launch identity across restart wit
     assert.equal(f.calls.filter(c => c[1] === 'execute').length, 0);
   } finally { await f.cleanup(); }
 });
+
+test('local image upload rejects symlinks and oversize files before wallet access', async () => {
+  const { mkdtemp, writeFile, symlink, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = await mkdtemp(join(tmpdir(), 'jump-icons-'));
+  const runner = new Runner({ api: 'https://example.com', chainId: '56', audience: 'https://example.com' });
+  try {
+    const file = join(dir, 'big.png');
+    await writeFile(file, Buffer.alloc(5 * 1024 * 1024 + 1));
+    await assert.rejects(() => runner.uploadImage(file, 'image/png'), /5 MiB/);
+    await symlink(file, join(dir, 'link.png'));
+    await assert.rejects(() => runner.uploadImage(join(dir, 'link.png'), 'image/png'));
+    await assert.rejects(() => runner.uploadImage('relative.png', 'image/png'), /absolute/);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});

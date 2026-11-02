@@ -267,8 +267,28 @@ export class Runner {
     return { previewId: id, confirmDigest: digest(plan), ...plan };
   }
 
+  async uploadImage(filePath: string, contentType: string) {
+    const { open, constants } = await import('node:fs/promises');
+    const { isAbsolute } = await import('node:path');
+    if (!isAbsolute(filePath) || !['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(contentType)) throw new Error('Use an absolute image file path and supported content type');
+    const file = await open(filePath, constants.O_RDONLY | constants.O_NOFOLLOW);
+    let bytes: Buffer;
+    try {
+      const stat = await file.stat();
+      if (!stat.isFile() || stat.size <= 0 || stat.size > 5 * 1024 * 1024) throw new Error('Image must be a regular file of at most 5 MiB');
+      bytes = Buffer.alloc(stat.size + 1);
+      const { bytesRead } = await file.read(bytes, 0, bytes.length, 0);
+      if (bytesRead !== stat.size) throw new Error('Image file changed during read');
+      bytes = bytes.subarray(0, bytesRead);
+    } finally { await file.close(); }
+    const wallet = await this.wallet.identity(chainId(this.options));
+    const form = new FormData();
+    form.set('file', new Blob([new Uint8Array(bytes)], { type: contentType }), 'icon');
+    return this.api.request('/agent/v1/local/creator/image-upload', { token: await this.session(wallet), form, timeoutMs: 30_000 });
+  }
+
   async creator(path: string, body?: unknown) {
-    if (!/^\/drafts(?:\/[1-9]\d*(?:\/(?:metadata|cancel))?)?(?:\?page=[1-9]\d{0,2}|\?page=1000)?$/.test(path)) throw new Error('Invalid creator resource');
+    if (path !== '/images' && !/^\/drafts(?:\/[1-9]\d*(?:\/(?:metadata|cancel))?)?(?:\?page=[1-9]\d{0,2}|\?page=1000)?$/.test(path)) throw new Error('Invalid creator resource');
     const wallet = await this.wallet.identity(chainId(this.options));
     return this.api.request(`/agent/v1/local/creator${path}`, { token: await this.session(wallet), ...(body === undefined ? {} : { body }) });
   }

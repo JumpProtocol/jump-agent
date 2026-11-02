@@ -15,16 +15,16 @@ export class JumpApi {
     this.base = url.href.replace(/\/$/, '');
   }
 
-  async request(path: string, options: { body?: unknown; token?: string; timeoutMs?: number } = {}): Promise<any> {
+  async request(path: string, options: { body?: unknown; token?: string; timeoutMs?: number; form?: FormData } = {}): Promise<any> {
     const timeoutMs = options.timeoutMs ?? 15_000;
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1_000 || timeoutMs > 30_000) {
       throw new Error('Jump API timeout must be between 1 and 30 seconds');
     }
     const response = await fetch(`${this.base}/api${path}`, {
-      method: options.body === undefined ? 'GET' : 'POST', redirect: 'error',
+      method: options.body === undefined && !options.form ? 'GET' : 'POST', redirect: 'error',
       signal: AbortSignal.timeout(timeoutMs),
-      headers: { 'Content-Type': 'application/json', ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}) },
-      ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+      headers: { ...(!options.form ? { 'Content-Type': 'application/json' } : {}), ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}) },
+      ...(options.form ? { body: options.form } : options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
     });
     if (!response.ok) throw new Error(`Jump API HTTP ${response.status}`);
     const reader = response.body?.getReader();

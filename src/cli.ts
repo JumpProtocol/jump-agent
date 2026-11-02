@@ -55,6 +55,10 @@ program.command('action-preview').description('Preview a named business operatio
   .action(async o => output(await runner().actionPreview({ token_id: Number(o.tokenId), action: o.action,
     ...(o.amount !== undefined ? { amount: o.amount } : {}), ...(o.paymentAsset ? { payment_asset: o.paymentAsset } : {}),
     ...(o.draftRevision ? { draft_revision: Number(o.draftRevision) } : {}), ...(o.feeAsset ? { fee_asset: o.feeAsset } : {}) })));
+program.command('upload-image').description('Upload a user-selected local token icon; does not launch or sign')
+  .requiredOption('--file <absolute-path>', 'Regular image file, maximum 5 MiB')
+  .addOption(new Option('--content-type <type>', 'Image MIME type').choices(['image/jpeg', 'image/png', 'image/gif', 'image/webp']).makeOptionMandatory())
+  .action(async o => output(await runner().uploadImage(o.file, o.contentType)));
 program.command('login-preview').description('Preview a Jump EIP-712 login signature, without approving it').action(async () => output(await runner().loginPreview()));
 program.command('execute').requiredOption('--preview-id <id>', 'Local preview ID')
   .requiredOption('--confirm-digest <sha256>', 'Digest of the exact preview the user explicitly confirmed')
