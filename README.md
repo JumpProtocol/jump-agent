@@ -16,12 +16,12 @@ See [client installation](references/installation.md) for Codex, Claude Code and
 
 ## Local MCP
 
-The MCP runtime runs locally with Node.js 22 or later and uses the separately installed official Binance `baw` CLI. The tagged v0.2.0 preview archive is served by the website release manifest, with immutable hash paths and checksums. There is no published npm package . Remote MCP is separately announced by deployment capabilities. Do not use an invented npm name, unverified endpoint, or repository-relative `agent/dist/cli.js` path.
+The MCP runtime runs locally with Node.js 22 or later and uses the separately installed official Binance `baw` CLI. The tagged v0.3.0 preview archive is served by the website release manifest, with immutable hash paths and checksums. There is no published npm package . Remote MCP is separately announced by deployment capabilities. Do not use an invented npm name, unverified endpoint, or repository-relative `agent/dist/cli.js` path.
 
 ## Safety
 
 - Check the trusted HTTPS origin and `/api/agent/v1/capabilities` before starting. Missing or disabled endpoints stop execution.
-- Money operations require scoped signed Agent login, a fresh exact preview, explicit user confirmation, shared server reservation and durable local state.
+- Money operations require scoped signed Agent login, a fresh exact preview, explicit user confirmation and the shared server reservation. The optional local runtime also requires durable local state.
 - Wallet keys remain with the wallet provider. Never share seed phrases, private keys, wallet sessions or API bearer tokens.
 - Never scan a forwarded QR. A matching pairing code does not establish who controls the browser session.
 - An unknown submission or missing transaction hash remains blocked. Never delete state or repeat execute to work around it.
@@ -35,10 +35,14 @@ A tagged preview candidate is available through https://app.jump.family/agent-di
 
 Unapproved client registrations expire after 10 minutes. After a first successful signed consent and token exchange, registered OAuth clients expire after 90 days without an authorization attempt. Active use extends registration; a dormant expired client must be removed and added again through its official client configuration. This is separate from the 30-minute wallet grant. Registration storage is capacity-limited and fails closed when full.
 
+Local runtime host compatibility: validated on macOS and Linux with glibc (including Node 22). The bundled native file-lock dependency has no Alpine/musl prebuilt binary; Alpine is unsupported by this archive. Use remote MCP there, or a supported glibc host. Never disable file locking to bypass this failure. Node >=22 alone is not a guarantee of support for every operating system.
+
+## Create and manage launches
+
+With explicit `jump:launch` consent, the remote wallet connection also provides six creator tools: create/list/update/cancel drafts, request launch, and request creator fees. Ask your Agent to prepare the launch terms, then open Jump’s confirmation page to review and sign. No platform creation fee is charged; network Gas remains. Existing live launches can update off-chain metadata only. The local CLI does not include creator commands. See the installed Jump Skill for parameters and revision/idempotency rules.
+
 ## Build and review the runtime source
 
 The source in this repository is independently buildable and includes its tests and locked dependencies. With Node.js >=22 installed, run `npm ci --ignore-scripts`, `npm run typecheck`, `npm test`, then `npm run build`. The local MCP command is `node /ABSOLUTE/PATH/dist/cli.js --api https://app.jump.family --chain-id 56 mcp`. Startup alone grants no wallet access; production preparation and coordination must be deployed before any transaction can execute.
 
 `npm run release:public` creates development artifacts under `release/`; `python3 scripts/verify-public-release.py` checks an isolated install. Formal candidate packaging requires a clean checkout at a matching version tag. CI records build provenance; public release publication remains a separate step.
-
-Local runtime host compatibility: validated on macOS and Linux with glibc (including Node 22). The bundled native file-lock dependency has no Alpine/musl prebuilt binary; Alpine is unsupported by this archive. Use remote MCP there, or a supported glibc host. Never disable file locking to bypass this failure. Node >=22 alone is not a guarantee of support for every operating system.

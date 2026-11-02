@@ -74,3 +74,28 @@ test('gateway bounds concurrent work and returns retry guidance under saturation
     assert.ok((await Promise.all(first)).every(r => r.status === 200));
   } finally { release(); server.closeAllConnections(); await new Promise<void>(r => server.close(()=>r())); }
 });
+
+test('creator tools require explicit launch scope and only prepare browser-confirmed actions', async () => {
+  const calls: {path: string; body: any}[] = [];
+  const f = await fixture(async (path, token, body) => {
+    calls.push({path,body});
+    if (path === '/api/mcp/session') return {resource:'https://jump.example/mcp/wallet',client_id:token,
+      scope:'jump:read jump:request jump:results jump:launch',expires_at:Math.floor(Date.now()/1000)+60};
+    if (path.endsWith('capabilities')) return {execution_chain_id:97};
+    return {token_id:1,revision:1};
+  });
+  const c = new Client({name:'creator-test',version:'1'});
+  try {
+    await c.connect(new StreamableHTTPClientTransport(new URL(f.url+'/mcp/wallet'),{requestInit:{headers:{Authorization:'Bearer creator'}}}));
+    const tools = (await c.listTools()).tools;
+    assert.equal(tools.length,13);
+    assert.ok(!tools.some(t=>/execute|sign|broadcast/.test(t.name)));
+    const result=await c.callTool({name:'jump_create_launch_draft',arguments:{clientRequestId:'00000000-0000-4000-8000-000000000002',name:'Creator',symbol:'CRT'}});
+    assert.equal(result.isError,undefined);
+    assert.equal(calls.find(x=>x.path==='/api/mcp/creator/drafts')!.body.dev_reserve_bps,0);
+    await c.callTool({name:'jump_request_launch',arguments:{clientRequestId:'00000000-0000-4000-8000-000000000003',tokenId:1,draftRevision:1}});
+    assert.deepEqual(calls.find(x=>x.path==='/api/mcp/requests')!.body,{chain_id:97,client_request_id:'00000000-0000-4000-8000-000000000003',action:'create-launch',token_id:1,draft_revision:1});
+    const bad=await c.callTool({name:'jump_request_launch',arguments:{clientRequestId:'00000000-0000-4000-8000-000000000004',tokenId:1,draftRevision:1,to:'0x'+'ab'.repeat(20)}});
+    assert.equal(bad.isError,true);
+  } finally { await c.close(); await f.close(); }
+});

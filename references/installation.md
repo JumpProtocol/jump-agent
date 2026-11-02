@@ -40,3 +40,7 @@ Before upgrading, resolve pending submissions and preserve private operation jou
 An available downloadable runtime is not live-wallet acceptance or permission to spend. Preview each signature/transaction and obtain explicit confirmation for the exact digest before execute. Missing provider hashes preserve the unresolved guard.
 
 Unapproved client registrations expire after 10 minutes. After a first successful signed consent and token exchange, registered OAuth clients expire after 90 days without an authorization attempt. Active use extends registration; a dormant expired client must be removed and added again through its official client configuration. This is separate from the 30-minute wallet grant. Registration storage is capacity-limited and fails closed when full.
+
+### Creator access
+
+The remote wallet endpoint can expose six creator tools when the deployment enables `creator_tools` and the owner grants `jump:launch`: `jump_create_launch_draft`, `jump_creator_launches`, `jump_update_launch_metadata`, `jump_cancel_launch_draft`, `jump_request_launch`, `jump_request_creator_fees`. Reauthorize existing clients to consent to the new scope. Creating a draft does not create a chain transaction. Launch and creator-fee requests return a browser confirmation link; the owner confirms each exact preview personally. Platform creation fee is zero; network Gas remains. Local CLI/stdio creator commands are not provided.
